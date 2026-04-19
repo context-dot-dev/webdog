@@ -1,0 +1,62 @@
+@import url("https://rsms.me/inter/inter.css");
+@import url("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss03";
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: var(--font-feature-settings);
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-white text-neutral-900;
+  }
+
+  /* Focus ring defaults matching brand accent */
+  :focus-visible {
+    outline-color: theme("colors.brand.500");
+  }
+
+  /* Subtle selection */
+  ::selection {
+    background: theme("colors.brand.100");
+    color: theme("colors.brand.900");
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-neutral-900 text-white hover:bg-neutral-800 px-3 py-2 shadow-xs ring-1 ring-neutral-900;
+  }
+  .btn-accent {
+    @apply btn bg-brand-500 text-white hover:bg-brand-600 px-3 py-2 shadow-xs ring-1 ring-brand-500;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-neutral-900 px-3 py-2 ring-1 ring-neutral-950/10 hover:bg-neutral-50;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-neutral-700 px-2.5 py-1.5 hover:bg-neutral-100;
+  }
+  .input {
+    @apply block w-full rounded-lg bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 ring-1 ring-neutral-950/10 focus:ring-2 focus:ring-brand-500 focus:outline-none;
+  }
+  .card {
+    @apply rounded-xl bg-white ring-1 ring-neutral-950/5 shadow-xs;
+  }
+  .kbd {
+    @apply rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-xs text-neutral-500;
+  }
+}
