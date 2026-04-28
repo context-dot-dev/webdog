@@ -24,7 +24,7 @@ export type TargetFetchEntry = {
 
 function buildChangeDetail(kind: "SITEMAP" | "MARKDOWN" | "PRODUCT", prev: Snapshot, curr: Snapshot): TargetChangeDetail {
   if (kind === "MARKDOWN") {
-    return { kind: "markdown", diffPreview: diffPreview(prev.payload, curr.payload) };
+    return { kind: "markdown", diffPreview: diffPreview(prev.payload, curr.payload).preview };
   }
   if (kind === "SITEMAP") {
     const a = JSON.parse(prev.payload) as string[];

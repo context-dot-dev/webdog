@@ -4,7 +4,14 @@ import path from "node:path";
 import fs from "node:fs";
 import * as schema from "./schema";
 
-const dbUrl = process.env.DATABASE_URL ?? "./data/web-watchdog.db";
+function resolveDatabaseUrl(): string {
+  const fromEnv = process.env.DATABASE_URL?.trim();
+  if (fromEnv) return fromEnv;
+  if (process.env.RAILWAY_PROJECT_ID) return "/data/web-watchdog.db";
+  return "./data/web-watchdog.db";
+}
+
+const dbUrl = resolveDatabaseUrl();
 const dbPath = path.isAbsolute(dbUrl) ? dbUrl : path.join(process.cwd(), dbUrl);
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });

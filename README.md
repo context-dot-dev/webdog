@@ -61,6 +61,44 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
 - Set **`BETTER_AUTH_URL`** to your public site URL and keep **`BETTER_AUTH_SECRET`** private.
 - Use `npm run build` then `npm run start` for the Next.js app, and run the **worker** separately (e.g. as another process or service) if you need scheduled checks.
 
+## Deploy on Railway (self-hosted, SQLite)
+
+The repo includes [`railway.json`](railway.json) so one **Railway service** runs both the Next.js app and the scrape **worker** in the same container. They share a single SQLite file on a **persistent volume** (ephemeral disk would reset the database on every deploy).
+
+### One-click template (operators)
+
+**You only need to provide a [context.dev](https://context.dev) API key.** Everything else has Railway-aware defaults:
+
+- **`CONTEXT_DEV_API_KEY`** — required for scrapes (same as local dev).
+- **`DATABASE_URL`** — optional; defaults to `/data/web-watchdog.db` on Railway when unset.
+- **`BETTER_AUTH_URL`** — optional; defaults to `https://$RAILWAY_PUBLIC_DOMAIN` when unset. Enable **public networking** and **generate a domain** (or set this to your custom domain).
+- **`BETTER_AUTH_SECRET`** — optional on Railway; if unset, a secret is written once to `/data/.better-auth-secret` on the volume (persists across deploys). You can still set this variable explicitly or use `${{secret(...)}}` in a [published template](https://docs.railway.com/guides/create).
+- **`SCRAPE_CRON`**, **`BETTER_AUTH_TRUSTED_ORIGINS`** — optional.
+
+Steps:
+
+1. Create a Railway project from this repo (or deploy a template based on it).
+2. Attach a **volume** at **`/data`** on the service.
+3. Turn on **public networking** and generate a Railway domain (or configure a custom domain).
+4. Set **`CONTEXT_DEV_API_KEY`** (and optional overrides above), then deploy.
+
+Pre-deploy runs `npm run db:migrate`; start runs the worker in the background and `next start` in the foreground. Health checks use `GET /api/health`.
+
+### Manual / non-template deploy
+
+| Variable | Example / notes |
+|----------|-----------------|
+| `DATABASE_URL` | `/data/web-watchdog.db` if not using the default above |
+| `BETTER_AUTH_SECRET` | Optional on Railway (volume file); required on Vercel / Netlify / Cloudflare |
+| `BETTER_AUTH_URL` | Your public `https://…` URL if not using `RAILWAY_PUBLIC_DOMAIN` |
+| `CONTEXT_DEV_API_KEY` | Bearer token for context.dev |
+
+If `better-sqlite3` fails to compile on the builder, add a Dockerfile with build tools and set Railway’s builder to Dockerfile (see [Railway builds](https://docs.railway.com/builds)).
+
+### Publishing your own Railway template
+
+In the [template composer](https://docs.railway.com/guides/create): add this repo as the service source, attach a volume at `/data`, enable HTTP public networking, and add a single **required** variable `CONTEXT_DEV_API_KEY` for deployers. Optional: add `BETTER_AUTH_SECRET=${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=` (see [template variable functions](https://docs.railway.com/guides/create#template-variable-functions)) instead of relying on the auto-generated volume secret. Copy the **template URL** Railway gives you into your README or site for true one-click deploys.
+
 ## Contributing
 
 Contributions are welcome. Please open an issue or pull request with a short description of the change.
