@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["better-sqlite3"],
+  /** External on the server avoids missing `vendor-chunks/better-auth.js` and related webpack chunk bugs. */
+  serverExternalPackages: ["better-sqlite3", "better-auth"],
 };
 
 export default nextConfig;

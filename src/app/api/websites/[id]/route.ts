@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { getApiUser, notFound } from "@/lib/api";
+import { badRequest, getApiUser, notFound, parseJson } from "@/lib/api";
+import { stringifyWebsiteNotificationDestinationIds } from "@/lib/website-notification-destinations";
+
+const patchSchema = z.object({
+  notificationDestinationIds: z.array(z.string().min(1)).nullable(),
+});
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, response } = await getApiUser();
@@ -27,6 +33,54 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   ]);
 
   return NextResponse.json({ website, targets, alerts });
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { user, response } = await getApiUser();
+  if (!user) return response;
+  const { id } = await params;
+
+  const [website] = await db
+    .select()
+    .from(schema.website)
+    .where(and(eq(schema.website.id, id), eq(schema.website.userId, user.id)))
+    .limit(1);
+  if (!website) return notFound("Website not found");
+
+  const parsed = await parseJson(req, patchSchema);
+  if (parsed.response) return parsed.response;
+
+  const ids = parsed.data.notificationDestinationIds;
+  if (ids !== null && ids.length > 0) {
+    const found = await db
+      .select({ id: schema.notificationDestination.id })
+      .from(schema.notificationDestination)
+      .where(
+        and(
+          eq(schema.notificationDestination.userId, user.id),
+          inArray(schema.notificationDestination.id, ids),
+        ),
+      );
+    if (found.length !== ids.length) {
+      return badRequest("One or more notification destinations are invalid");
+    }
+  }
+
+  const stored =
+    ids === null ? null : stringifyWebsiteNotificationDestinationIds(ids);
+
+  await db
+    .update(schema.website)
+    .set({ notificationDestinationIds: stored })
+    .where(eq(schema.website.id, id));
+
+  const [updated] = await db
+    .select()
+    .from(schema.website)
+    .where(eq(schema.website.id, id))
+    .limit(1);
+
+  return NextResponse.json({ website: updated });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

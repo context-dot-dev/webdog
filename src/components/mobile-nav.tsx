@@ -8,6 +8,7 @@ import { authClient } from "@/lib/auth-client";
 const links = [
   { href: "/dashboard", label: "Websites" },
   { href: "/dashboard/alerts", label: "Alerts" },
+  { href: "/dashboard/settings", label: "Settings" },
 ];
 
 export function MobileNav({ user }: { user: { name: string; email: string } }) {

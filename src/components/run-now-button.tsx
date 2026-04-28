@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function RunNowButton({ websiteId }: { websiteId: string }) {
+export function RunNowButton({ websiteId, targetId }: { websiteId: string; targetId?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +14,7 @@ export function RunNowButton({ websiteId }: { websiteId: string }) {
     const res = await fetch("/api/cron/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ websiteId }),
+      body: JSON.stringify(targetId ? { websiteId, targetId } : { websiteId }),
     });
     setBusy(false);
     if (!res.ok) {
@@ -28,14 +28,20 @@ export function RunNowButton({ websiteId }: { websiteId: string }) {
   return (
     <div className="flex items-center gap-3">
       {error && <span className="text-xs text-brand-700">{error}</span>}
-      <button type="button" onClick={run} disabled={busy} className="btn-secondary">
+      <button
+        type="button"
+        onClick={run}
+        disabled={busy}
+        className="btn-secondary text-xs px-2 py-1.5"
+        aria-label={targetId ? "Check this target now" : "Check all enabled targets now"}
+      >
         {busy ? (
           <>
-            <Spinner className="size-3.5" /> Checking…
+            <Spinner className="size-3" /> Checking…
           </>
         ) : (
           <>
-            <RefreshIcon className="size-4" /> Check now
+            <RefreshIcon className="size-3" /> Check now
           </>
         )}
       </button>

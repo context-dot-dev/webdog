@@ -10,6 +10,7 @@ import {
   normalizeDomain,
   pickBrandAssets,
   retrieveBrand,
+  scrapeScreenshot,
 } from "@/lib/context-client";
 
 export async function GET() {
@@ -25,6 +26,7 @@ export async function GET() {
       title: schema.website.title,
       description: schema.website.description,
       logoUrl: schema.website.logoUrl,
+      heroScreenshotUrl: schema.website.heroScreenshotUrl,
       backdropUrl: schema.website.backdropUrl,
       createdAt: schema.website.createdAt,
       targetCount: sql<number>`(SELECT COUNT(*) FROM ${schema.target} WHERE ${schema.target.websiteId} = ${schema.website.id})`,
@@ -51,15 +53,46 @@ export async function POST(req: Request) {
   const domain = normalizeDomain(parsed.data.domain);
   if (!domain) return badRequest("Enter a valid domain like example.com");
 
+  const [settings] = await db
+    .select({ contextDevApiKey: schema.userNotificationSettings.contextDevApiKey })
+    .from(schema.userNotificationSettings)
+    .where(eq(schema.userNotificationSettings.userId, user.id))
+    .limit(1);
+  const contextKey = settings?.contextDevApiKey?.trim() || null;
+
+  const hasContextKey = Boolean(
+    (contextKey?.trim() || process.env.CONTEXT_DEV_API_KEY?.trim() || undefined),
+  );
+
   let assets = pickBrandAssets(null);
-  try {
-    const brand = await retrieveBrand(domain);
-    assets = pickBrandAssets(brand);
-  } catch (err) {
-    if (err instanceof ContextDevError && err.status !== 404) {
-      console.warn(`retrieveBrand(${domain}) failed:`, err.message);
-    }
-  }
+  let heroScreenshotUrl: string | null = null;
+
+  await Promise.all([
+    (async () => {
+      if (!hasContextKey) return;
+      try {
+        const brand = await retrieveBrand(domain, { apiKey: contextKey });
+        assets = pickBrandAssets(brand);
+      } catch (err) {
+        if (err instanceof ContextDevError && err.status !== 404) {
+          console.warn(`retrieveBrand(${domain}) failed:`, err.message);
+        }
+      }
+    })(),
+    (async () => {
+      if (!hasContextKey) return;
+      try {
+        const shot = await scrapeScreenshot({ domain, apiKey: contextKey, prioritize: "quality" });
+        if (shot.screenshot) heroScreenshotUrl = shot.screenshot;
+      } catch (err) {
+        if (err instanceof ContextDevError) {
+          console.warn(`scrapeScreenshot(${domain}) failed:`, err.message);
+        } else {
+          throw err;
+        }
+      }
+    })(),
+  ]);
 
   const id = newId("web");
   await db.insert(schema.website).values({
@@ -71,6 +104,7 @@ export async function POST(req: Request) {
     title: assets.title,
     description: assets.description,
     logoUrl: assets.logoUrl,
+    heroScreenshotUrl,
     backdropUrl: assets.backdropUrl,
     createdAt: new Date(),
   });

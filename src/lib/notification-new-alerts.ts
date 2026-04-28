@@ -1,0 +1,322 @@
+/**
+ * Shared structure for "new alerts" notifications across Slack and email.
+ */
+
+export type NewAlertsSite = { id: string; name: string; domain: string };
+
+export type NewAlertsAlert = {
+  id: string;
+  title: string;
+  /** Raw diff string from diffPreview() — lines prefixed with "+ " or "- ". */
+  diffPreview?: string;
+  /** True total added lines (may exceed what's stored in diffPreview). */
+  totalAdded?: number;
+  /** True total removed lines (may exceed what's stored in diffPreview). */
+  totalRemoved?: number;
+};
+
+export type NewAlertsPayload = {
+  kind: "new_alerts";
+  appBaseUrl: string;
+  site: NewAlertsSite;
+  alerts: NewAlertsAlert[];
+};
+
+/** JSON body POSTed to the user-configured alert webhook URL. */
+export type NewAlertsWebhookBody = {
+  type: "web_watchdog.new_alerts";
+  version: 1;
+  kind: "new_alerts";
+  appBaseUrl: string;
+  site: NewAlertsSite;
+  alerts: NewAlertsAlert[];
+  /** Same human-readable summary as the Slack fallback text / email. */
+  summaryText: string;
+};
+
+// ---------------------------------------------------------------------------
+// Slack Block Kit types (subset needed for outbound webhook payloads)
+// ---------------------------------------------------------------------------
+
+type SlackTextObject =
+  | { type: "plain_text"; text: string; emoji?: boolean }
+  | { type: "mrkdwn"; text: string };
+
+type SlackButtonElement = {
+  type: "button";
+  text: { type: "plain_text"; text: string; emoji?: boolean };
+  url: string;
+  action_id?: string;
+};
+
+export type SlackBlock =
+  | { type: "header"; text: { type: "plain_text"; text: string; emoji?: boolean } }
+  | { type: "section"; text: SlackTextObject }
+  | { type: "divider" }
+  | { type: "actions"; elements: SlackButtonElement[] };
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function trunc(s: string, max: number): string {
+  return s.length <= max ? s : s.slice(0, max - 1) + "…";
+}
+
+/** Escape Slack mrkdwn HTML entities (safe inside ~…~ and _…_ spans). */
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * If the total number of changed lines (added + removed) is at or below this
+ * threshold, show all of them inline. Otherwise show a preview + "View all" button.
+ */
+const INLINE_CHANGE_LIMIT = 3;
+
+/**
+ * Parse the raw diff string into separate add/del arrays and compute the true
+ * total change count.
+ */
+function parseDiffLines(alert: NewAlertsAlert): {
+  addLines: string[];
+  delLines: string[];
+  totalChanges: number;
+} {
+  const { diffPreview } = alert;
+  if (!diffPreview?.trim()) return { addLines: [], delLines: [], totalChanges: 0 };
+
+  const addLines: string[] = [];
+  const delLines: string[] = [];
+  for (const line of diffPreview.split("\n").filter(Boolean)) {
+    if (line.startsWith("+ ") || line === "+") addLines.push(line.slice(2));
+    else if (line.startsWith("- ") || line === "-") delLines.push(line.slice(2));
+  }
+
+  const totalAdded = alert.totalAdded ?? addLines.length;
+  const totalRemoved = alert.totalRemoved ?? delLines.length;
+  return { addLines, delLines, totalChanges: totalAdded + totalRemoved };
+}
+
+/**
+ * Build the mrkdwn diff lines for a single alert.
+ * – deleted lines → `~strikethrough~`
+ * – added lines   → `_italic_`
+ * Returns the diff lines (already mrkdwn-formatted) and whether there are more
+ * changes that didn't fit in the preview.
+ */
+function buildDiffMrkdwnLines(
+  alert: NewAlertsAlert,
+): { lines: string[]; hasMore: boolean; totalChanges: number } {
+  const { addLines, delLines, totalChanges } = parseDiffLines(alert);
+  if (totalChanges === 0) return { lines: [], hasMore: false, totalChanges: 0 };
+
+  const hasMore = totalChanges > INLINE_CHANGE_LIMIT;
+  const parts: string[] = [];
+
+  if (!hasMore) {
+    const k = Math.min(addLines.length, delLines.length);
+    for (let i = 0; i < k; i++) {
+      parts.push(`~${esc(delLines[i])}~`);
+      parts.push(`_${esc(addLines[i])}_`);
+    }
+    for (let i = k; i < delLines.length; i++) parts.push(`~${esc(delLines[i])}~`);
+    for (let i = k; i < addLines.length; i++) parts.push(`_${esc(addLines[i])}_`);
+  } else {
+    // Show only the first pair for the preview
+    if (delLines[0]) parts.push(`~${esc(delLines[0])}~`);
+    if (addLines[0]) parts.push(`_${esc(addLines[0])}_`);
+  }
+
+  return { lines: parts, hasMore, totalChanges };
+}
+
+function alertUrl(appBaseUrl: string, siteId: string, alertId: string): string {
+  return new URL(`/dashboard/websites/${siteId}?alert=${alertId}`, appBaseUrl).toString();
+}
+
+// ---------------------------------------------------------------------------
+// Public builders
+// ---------------------------------------------------------------------------
+
+export function buildNewAlertsPayload(
+  appBaseUrl: string,
+  site: NewAlertsSite,
+  alerts: NewAlertsAlert[],
+): NewAlertsPayload {
+  return { kind: "new_alerts", appBaseUrl, site, alerts };
+}
+
+/**
+ * Builds a Slack Block Kit payload for a "new alerts" notification.
+ *
+ * Structure per alert:
+ *   • section: bold title + mrkdwn diff lines (~deleted~, _added_)
+ *   • actions block (only when changes > INLINE_CHANGE_LIMIT): real link button
+ */
+export function buildNewAlertsSlackBlocks(payload: NewAlertsPayload): SlackBlock[] {
+  const { appBaseUrl, site, alerts } = payload;
+  const n = alerts.length;
+  const openUrl = new URL(`/dashboard/websites/${site.id}`, appBaseUrl).toString();
+  const maxAlerts = 5;
+
+  const blocks: SlackBlock[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: `Web Watchdog: ${n} new change${n === 1 ? "" : "s"}`,
+        emoji: true,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*${esc(site.name)}* (${esc(site.domain)})`,
+      },
+    },
+  ];
+
+  for (const a of alerts.slice(0, maxAlerts)) {
+    blocks.push({ type: "divider" });
+
+    const { lines: diffLines, hasMore, totalChanges } = buildDiffMrkdwnLines(a);
+    const url = alertUrl(appBaseUrl, site.id, a.id);
+
+    let sectionText = `*${esc(trunc(a.title, 200))}*`;
+    if (diffLines.length > 0) sectionText += "\n" + diffLines.join("\n");
+
+    blocks.push({ type: "section", text: { type: "mrkdwn", text: sectionText } });
+
+    if (hasMore) {
+      blocks.push({
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: { type: "plain_text", text: `View all ${totalChanges} changes`, emoji: false },
+            url,
+            action_id: `view_alert_${a.id}`,
+          },
+        ],
+      });
+    }
+  }
+
+  if (n > maxAlerts) {
+    blocks.push({ type: "divider" });
+    const extra = n - maxAlerts;
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `_… and ${extra} more change${extra === 1 ? "" : "s"}_` },
+    });
+  }
+
+  blocks.push({ type: "divider" });
+  blocks.push({
+    type: "section",
+    text: { type: "mrkdwn", text: `<${openUrl}|Open in Web Watchdog>` },
+  });
+
+  return blocks;
+}
+
+/**
+ * Plain-text fallback string (required alongside blocks for Slack notifications
+ * and used for email).  Inline "View all" link for the >3 changes case since
+ * blocks aren't available in plain text contexts.
+ */
+export function formatNewAlertsSlackText(payload: NewAlertsPayload): string {
+  const { appBaseUrl, site, alerts } = payload;
+  const n = alerts.length;
+  const openUrl = new URL(`/dashboard/websites/${site.id}`, appBaseUrl).toString();
+  const maxAlerts = 5;
+
+  const lines = alerts
+    .slice(0, maxAlerts)
+    .map((a) => {
+      const { lines: diffLines, hasMore, totalChanges } = buildDiffMrkdwnLines(a);
+      let text = `• ${trunc(a.title, 200)}`;
+      if (diffLines.length > 0) {
+        const url = alertUrl(appBaseUrl, site.id, a.id);
+        const shown = diffLines.filter((l) => l.startsWith("~") || l.startsWith("_")).length;
+        const suffix =
+          hasMore
+            ? `\n_Showing ${shown} of ${totalChanges} changes_ · <${url}|View all>`
+            : "";
+        text += "\n" + diffLines.join("\n") + suffix;
+      }
+      return text;
+    })
+    .join("\n\n");
+  const more = n > maxAlerts ? `\n… and ${n - maxAlerts} more` : "";
+
+  return `Web Watchdog: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}`;
+}
+
+export function buildNewAlertsWebhookBody(payload: NewAlertsPayload): NewAlertsWebhookBody {
+  return {
+    type: "web_watchdog.new_alerts",
+    version: 1,
+    kind: payload.kind,
+    appBaseUrl: payload.appBaseUrl,
+    site: payload.site,
+    alerts: payload.alerts,
+    summaryText: formatNewAlertsSlackText(payload),
+  };
+}
+
+export function formatNewAlertsEmailSubject(payload: NewAlertsPayload): string {
+  return `Web Watchdog: ${payload.alerts.length} new change(s) for ${payload.site.name}`;
+}
+
+/** Plain text email body with inline +/- diff preview. */
+export function formatNewAlertsEmailText(payload: NewAlertsPayload): string {
+  const { appBaseUrl, site, alerts } = payload;
+  const n = alerts.length;
+  const openUrl = new URL(`/dashboard/websites/${site.id}`, appBaseUrl).toString();
+  const maxAlerts = 5;
+
+  const lines = alerts
+    .slice(0, maxAlerts)
+    .map((a) => {
+      const { addLines, delLines, totalChanges } = parseDiffLines(a);
+      if (totalChanges === 0) return `• ${trunc(a.title, 200)}`;
+
+      const hasMore = totalChanges > INLINE_CHANGE_LIMIT;
+      const parts: string[] = [`• ${trunc(a.title, 200)}`];
+
+      if (!hasMore) {
+        const k = Math.min(addLines.length, delLines.length);
+        for (let i = 0; i < k; i++) {
+          parts.push(`  - ${delLines[i]}`);
+          parts.push(`  + ${addLines[i]}`);
+        }
+        for (let i = k; i < delLines.length; i++) parts.push(`  - ${delLines[i]}`);
+        for (let i = k; i < addLines.length; i++) parts.push(`  + ${addLines[i]}`);
+      } else {
+        const shownCount = (delLines[0] ? 1 : 0) + (addLines[0] ? 1 : 0);
+        if (delLines[0]) parts.push(`  - ${delLines[0]}`);
+        if (addLines[0]) parts.push(`  + ${addLines[0]}`);
+        const url = alertUrl(appBaseUrl, site.id, a.id);
+        parts.push(`  Showing ${shownCount} of ${totalChanges} changes — View all: ${url}`);
+      }
+
+      return parts.join("\n");
+    })
+    .join("\n\n");
+  const more = n > maxAlerts ? `\n… and ${n - maxAlerts} more` : "";
+
+  return `Web Watchdog: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}`;
+}
+
+/** Backwards-compatible helper matching the previous notify-slack signature. */
+export function buildNewAlertsSlackText(
+  appBaseUrl: string,
+  site: NewAlertsSite,
+  alertTitles: string[],
+): string {
+  const alerts = alertTitles.map((title, i) => ({ id: `legacy-${i}`, title }));
+  return formatNewAlertsSlackText(buildNewAlertsPayload(appBaseUrl, site, alerts));
+}

@@ -16,15 +16,24 @@ export class ContextDevError extends Error {
   }
 }
 
-function apiKey(): string {
-  const key = process.env.CONTEXT_DEV_API_KEY;
-  if (!key) throw new ContextDevError("CONTEXT_DEV_API_KEY is not set", 500);
-  return key;
+/**
+ * @param override - Per-user key from Settings; when absent or empty, uses `CONTEXT_DEV_API_KEY`.
+ */
+function resolveApiKey(override?: string | null): string {
+  const trimmed = override?.trim();
+  if (trimmed) return trimmed;
+  const fromEnv = process.env.CONTEXT_DEV_API_KEY?.trim();
+  if (fromEnv) return fromEnv;
+  throw new ContextDevError(
+    "context.dev API key is not set. Add it in Settings or set CONTEXT_DEV_API_KEY in the environment.",
+    500,
+  );
 }
 
 async function request<T>(
   pathname: string,
   params: Record<string, string | number | boolean | undefined>,
+  bearerToken: string,
 ): Promise<T> {
   const url = new URL(`${API_BASE}${pathname}`);
   for (const [k, v] of Object.entries(params)) {
@@ -35,7 +44,7 @@ async function request<T>(
   const res = await fetch(url, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${apiKey()}`,
+      Authorization: `Bearer ${bearerToken}`,
       "Content-Type": "application/json",
     },
   });
@@ -57,6 +66,64 @@ async function request<T>(
   }
 
   return (await res.json()) as T;
+}
+
+async function postRequest<T>(pathname: string, body: Record<string, unknown>, bearerToken: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${pathname}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${bearerToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    let message = `context.dev responded ${res.status}`;
+    let code: string | undefined;
+    try {
+      const errBody = (await res.json()) as { message?: string; error_code?: string };
+      if (errBody?.message) message = errBody.message;
+      code = errBody?.error_code;
+    } catch {
+      // non-JSON error body
+    }
+    throw new ContextDevError(message, res.status, code);
+  }
+
+  return (await res.json()) as T;
+}
+
+/**
+ * @see https://docs.context.dev/api-reference/web-extraction/extract-a-single-product-from-a-url
+ */
+export interface ExtractProductResult {
+  is_product_page: boolean;
+  platform: "amazon" | "tiktok_shop" | "etsy" | "generic" | null;
+  product: {
+    name: string;
+    description: string;
+    price: number | null;
+    currency: string | null;
+    url?: string | null;
+  } | null;
+}
+
+export interface ExtractProductOptions {
+  timeoutMS?: number;
+  /** Per-user key; falls back to CONTEXT_DEV_API_KEY. */
+  apiKey?: string | null;
+}
+
+export async function extractProduct(
+  url: string,
+  options: ExtractProductOptions = {},
+): Promise<ExtractProductResult> {
+  const { apiKey, timeoutMS } = options;
+  const key = resolveApiKey(apiKey);
+  const body: Record<string, unknown> = { url };
+  if (timeoutMS !== undefined) body.timeoutMS = timeoutMS;
+  return postRequest<ExtractProductResult>("/brand/ai/product", body, key);
 }
 
 export interface ScrapeMarkdownResult {
@@ -84,36 +151,97 @@ export interface ScrapeMarkdownOptions {
   useMainContentOnly?: boolean;
   /** Cache duration in ms. 0 forces a fresh scrape. */
   maxAgeMs?: number;
+  /** Per-user key; falls back to CONTEXT_DEV_API_KEY. */
+  apiKey?: string | null;
 }
 
 export async function scrapeMarkdown(
   url: string,
   options: ScrapeMarkdownOptions = {},
 ): Promise<ScrapeMarkdownResult> {
-  return request<ScrapeMarkdownResult>("/web/scrape/markdown", {
-    url,
-    includeLinks: options.includeLinks,
-    includeImages: options.includeImages,
-    shortenBase64Images: options.shortenBase64Images,
-    useMainContentOnly: options.useMainContentOnly ?? true,
-    maxAgeMs: 0,
-  });
+  const { apiKey, maxAgeMs: _m, ...rest } = options;
+  const key = resolveApiKey(apiKey);
+  return request<ScrapeMarkdownResult>(
+    "/web/scrape/markdown",
+    {
+      url,
+      includeLinks: rest.includeLinks,
+      includeImages: rest.includeImages,
+      shortenBase64Images: rest.shortenBase64Images,
+      useMainContentOnly: rest.useMainContentOnly ?? true,
+      maxAgeMs: 0,
+    },
+    key,
+  );
 }
 
 export interface ScrapeSitemapOptions {
   maxLinks?: number;
   urlRegex?: string;
+  /** Per-user key; falls back to CONTEXT_DEV_API_KEY. */
+  apiKey?: string | null;
 }
 
 export async function scrapeSitemap(
   domain: string,
   options: ScrapeSitemapOptions = {},
 ): Promise<ScrapeSitemapResult> {
-  return request<ScrapeSitemapResult>("/web/scrape/sitemap", {
-    domain,
-    maxLinks: options.maxLinks,
-    urlRegex: options.urlRegex,
-  });
+  const { apiKey, ...rest } = options;
+  const key = resolveApiKey(apiKey);
+  return request<ScrapeSitemapResult>(
+    "/web/scrape/sitemap",
+    {
+      domain,
+      maxLinks: rest.maxLinks,
+      urlRegex: rest.urlRegex,
+    },
+    key,
+  );
+}
+
+/**
+ * @see https://docs.context.dev/api-reference/web-scraping/scrape-screenshot
+ */
+export interface ScrapeScreenshotResult {
+  status: string;
+  domain: string;
+  screenshot: string;
+  screenshotType: "viewport" | "fullPage";
+  code: number;
+}
+
+export interface ScrapeScreenshotOptions {
+  /** Normalized domain (e.g. example.com) — home page. Mutually exclusive with `directUrl`. */
+  domain?: string;
+  /** Exact URL to capture. Mutually exclusive with `domain`. */
+  directUrl?: string;
+  fullScreenshot?: boolean;
+  prioritize?: "speed" | "quality";
+  /** Per-user key; falls back to CONTEXT_DEV_API_KEY. */
+  apiKey?: string | null;
+}
+
+export async function scrapeScreenshot(
+  options: ScrapeScreenshotOptions = {},
+): Promise<ScrapeScreenshotResult> {
+  const { apiKey, domain, directUrl, fullScreenshot, prioritize } = options;
+  const key = resolveApiKey(apiKey);
+  if (domain && directUrl) {
+    throw new ContextDevError("Pass either domain or directUrl, not both.", 400);
+  }
+  if (!domain && !directUrl) {
+    throw new ContextDevError("Pass domain or directUrl for screenshot.", 400);
+  }
+  return request<ScrapeScreenshotResult>(
+    "/web/screenshot",
+    {
+      domain: domain ?? undefined,
+      directUrl: directUrl ?? undefined,
+      fullScreenshot: fullScreenshot ? "true" : fullScreenshot === false ? "false" : undefined,
+      prioritize: prioritize,
+    },
+    key,
+  );
 }
 
 export function parseDomain(input: string): string {
@@ -171,10 +299,18 @@ interface RetrieveBrandResponse {
   brand: BrandData;
 }
 
-export async function retrieveBrand(domain: string): Promise<BrandData> {
-  const res = await request<RetrieveBrandResponse>("/brand/retrieve", {
-    domain,
-  });
+export async function retrieveBrand(
+  domain: string,
+  options?: { apiKey?: string | null },
+): Promise<BrandData> {
+  const key = resolveApiKey(options?.apiKey);
+  const res = await request<RetrieveBrandResponse>(
+    "/brand/retrieve",
+    {
+      domain,
+    },
+    key,
+  );
   return res.brand;
 }
 

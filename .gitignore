@@ -1,15 +1,51 @@
+# Dependencies
 node_modules
+
+# Next.js
 .next
 out
+
+# Production / build
 dist
 
-.env
-.env.local
+# TypeScript
+*.tsbuildinfo
 
+# Environment (keep .env.example committed)
+.env
+.env*.local
+
+# Vercel
+.vercel
+
+# SQLite (local dev DBs)
 data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 
-.DS_Store
+# Logs & debug
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage (if you add tests later)
+coverage
+.nyc_output
+
+# ESLint
+.eslintcache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / IDE (optional local junk)
+.idea
+*.swp
+*.swo
+
+# Secrets / certs (never commit)
+*.pem

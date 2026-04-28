@@ -6,7 +6,10 @@ import * as schema from "@/lib/db/schema";
 import { getApiUser, notFound, parseJson } from "@/lib/api";
 import { runWebsiteChecks } from "@/lib/scraper";
 
-const bodySchema = z.object({ websiteId: z.string().min(1) });
+const bodySchema = z.object({
+  websiteId: z.string().min(1),
+  targetId: z.string().min(1).optional(),
+});
 
 /** Manual-trigger endpoint. Lets the UI say "check now" without waiting for cron. */
 export async function POST(req: Request) {
@@ -23,6 +26,18 @@ export async function POST(req: Request) {
     .limit(1);
   if (!website) return notFound("Website not found");
 
-  const result = await runWebsiteChecks(website.id);
+  if (parsed.data.targetId) {
+    const [target] = await db
+      .select({ id: schema.target.id })
+      .from(schema.target)
+      .where(and(eq(schema.target.id, parsed.data.targetId), eq(schema.target.websiteId, website.id)))
+      .limit(1);
+    if (!target) return notFound("Target not found");
+  }
+
+  const result = await runWebsiteChecks(website.id, {
+    force: true,
+    ...(parsed.data.targetId ? { targetId: parsed.data.targetId } : {}),
+  });
   return NextResponse.json(result);
 }

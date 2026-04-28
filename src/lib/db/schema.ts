@@ -55,6 +55,50 @@ export const verification = sqliteTable("verification", {
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" }),
 });
 
+/**
+ * One row per user: shared secrets (Resend API key, context.dev) not tied to a single destination.
+ */
+export const userNotificationSettings = sqliteTable("userNotificationSettings", {
+  userId: text("userId")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** Overrides process.env.CONTEXT_DEV_API_KEY for this user’s scrapes and brand fetch. */
+  contextDevApiKey: text("contextDevApiKey"),
+  /** Shared Resend API key for all EMAIL destinations. */
+  resendApiKey: text("resendApiKey"),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+/**
+ * Named outbound integrations (Slack webhooks, email routes, generic JSON webhooks).
+ */
+export const notificationDestination = sqliteTable(
+  "notificationDestination",
+  {
+    id: text("id").primaryKey(),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    channel: text("channel", { enum: ["SLACK", "EMAIL", "WEBHOOK"] }).notNull(),
+    name: text("name").notNull(),
+    slackWebhookUrl: text("slackWebhookUrl"),
+    resendFromEmail: text("resendFromEmail"),
+    resendToEmails: text("resendToEmails"),
+    alertWebhookUrl: text("alertWebhookUrl"),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byUser: index("notification_destination_user_idx").on(t.userId),
+  }),
+);
+
 /* ------------------------------------------------------------------ */
 /* Domain tables                                                      */
 /* ------------------------------------------------------------------ */
@@ -72,7 +116,14 @@ export const website = sqliteTable(
     title: text("title"),
     description: text("description"),
     logoUrl: text("logoUrl"),
+    /** context.dev /web/screenshot public URL; preferred over `backdropUrl` for hero/cards. */
+    heroScreenshotUrl: text("heroScreenshotUrl"),
     backdropUrl: text("backdropUrl"),
+    /**
+     * JSON string array of notificationDestination ids to notify; null/empty = all destinations.
+     * Use `[]` to disable notifications for this site.
+     */
+    notificationDestinationIds: text("notificationDestinationIds"),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -84,9 +135,9 @@ export const website = sqliteTable(
 
 /**
  * Target types:
- *   NEW_LINK          — alert when the sitemap gains URLs
- *   REMOVED_LINK      — alert when the sitemap loses URLs
+ *   SITEMAP_LINKS     — alert on sitemap URL changes (`linkScope` chooses new / removed / both).
  *   PAGE_CONTENT      — alert when a specific page's markdown changes
+ *   PRODUCT_PRICE     — alert when a product page's price/currency changes (context.dev product API)
  */
 export const target = sqliteTable(
   "target",
@@ -95,11 +146,20 @@ export const target = sqliteTable(
     websiteId: text("websiteId")
       .notNull()
       .references(() => website.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["NEW_LINK", "REMOVED_LINK", "PAGE_CONTENT"] }).notNull(),
-    /** For PAGE_CONTENT: the specific page URL to watch. Null otherwise. */
+    kind: text("kind", { enum: ["SITEMAP_LINKS", "PAGE_CONTENT", "PRODUCT_PRICE"] }).notNull(),
+    /** For SITEMAP_LINKS: which diffs notify. Null elsewhere. */
+    linkScope: text("linkScope", { enum: ["NEW", "REMOVED", "BOTH"] }),
+    /** For PAGE_CONTENT / PRODUCT_PRICE: the page URL. Null for sitemap-based targets. */
     pageUrl: text("pageUrl"),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    /** How often this target is checked (worker tick is the granularity; must elapse since lastCheckedAt). */
+    checkIntervalHours: integer("checkIntervalHours").notNull().default(1),
     lastCheckedAt: integer("lastCheckedAt", { mode: "timestamp_ms" }),
+    /** When set, outbound alerts from this target go only here; when null, use website-level routing. */
+    notificationDestinationId: text("notificationDestinationId").references(
+      () => notificationDestination.id,
+      { onDelete: "set null" },
+    ),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -115,6 +175,7 @@ export const target = sqliteTable(
  *
  *  - kind=SITEMAP         payload = JSON string array of URLs
  *  - kind=MARKDOWN        payload = markdown body; targetUrl set
+ *  - kind=PRODUCT        payload = JSON of extracted product/price; targetUrl = product page URL
  */
 export const snapshot = sqliteTable(
   "snapshot",
@@ -123,8 +184,8 @@ export const snapshot = sqliteTable(
     websiteId: text("websiteId")
       .notNull()
       .references(() => website.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["SITEMAP", "MARKDOWN"] }).notNull(),
-    /** For MARKDOWN: the URL that was scraped. Null for SITEMAP. */
+    kind: text("kind", { enum: ["SITEMAP", "MARKDOWN", "PRODUCT"] }).notNull(),
+    /** For MARKDOWN / PRODUCT: the URL. Null for SITEMAP. */
     targetUrl: text("targetUrl"),
     payload: text("payload").notNull(),
     /** sha256 of payload — cheap equality checks. */
@@ -148,9 +209,9 @@ export const alert = sqliteTable(
     targetId: text("targetId")
       .notNull()
       .references(() => target.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["NEW_LINK", "REMOVED_LINK", "PAGE_CONTENT"] }).notNull(),
+    kind: text("kind", { enum: ["NEW_LINK", "REMOVED_LINK", "PAGE_CONTENT", "PRODUCT_PRICE"] }).notNull(),
     title: text("title").notNull(),
-    /** JSON blob: { added?: string[]; removed?: string[]; pageUrl?: string; diffPreview?: string } */
+    /** JSON: link/content/product fields depending on kind */
     details: text("details").notNull(),
     read: integer("read", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
@@ -164,8 +225,13 @@ export const alert = sqliteTable(
 );
 
 export type User = typeof user.$inferSelect;
+export type UserNotificationSettings = typeof userNotificationSettings.$inferSelect;
+export type NotificationDestination = typeof notificationDestination.$inferSelect;
+export type NotificationChannel = NotificationDestination["channel"];
 export type Website = typeof website.$inferSelect;
 export type Target = typeof target.$inferSelect;
 export type Snapshot = typeof snapshot.$inferSelect;
 export type Alert = typeof alert.$inferSelect;
+export type AlertKind = Alert["kind"];
 export type TargetKind = Target["kind"];
+export type LinkScope = NonNullable<Target["linkScope"]>;

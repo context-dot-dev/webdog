@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -31,20 +30,25 @@ export default async function AlertsPage() {
       <section className="mt-8">
         {rows.length === 0 ? (
           <div className="rounded-2xl bg-white p-10 text-center ring-1 ring-neutral-950/5">
-            <p className="text-sm text-neutral-600">Nothing here yet. Alerts appear once changes are detected.</p>
+            <p className="text-sm text-neutral-600">
+              Nothing here yet. Alerts appear once changes are detected.
+            </p>
           </div>
         ) : (
-          <ul role="list" className="divide-y divide-neutral-950/5 overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-950/5">
+          <ul
+            role="list"
+            className="divide-y divide-neutral-950/10 overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-950/5"
+          >
             {rows.map(({ alert, websiteId, websiteName, websiteDomain }) => (
-              <li key={alert.id}>
-                <div className="px-5 pt-3 text-xs text-neutral-500">
-                  <Link href={`/dashboard/websites/${websiteId}`} className="hover:text-brand-700">
-                    <span className="font-medium text-neutral-700">{websiteName}</span>{" "}
-                    <span className="font-mono">{websiteDomain}</span>
-                  </Link>
-                </div>
-                <AlertItem alert={alert} />
-              </li>
+              <AlertItem
+                key={alert.id}
+                alert={alert}
+                website={{
+                  id: websiteId,
+                  name: websiteName,
+                  domain: websiteDomain,
+                }}
+              />
             ))}
           </ul>
         )}

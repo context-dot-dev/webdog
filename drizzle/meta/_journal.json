@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1777229389857,
+      "tag": "0000_melted_blackheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1777245700099,
+      "tag": "0001_hero_screenshot_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1777250000000,
+      "tag": "0002_resend_notification_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1777260000000,
+      "tag": "0003_alert_webhook_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1777270000000,
+      "tag": "0004_notification_destinations",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1777280000000,
+      "tag": "0005_target_notification_destination",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1777290000000,
+      "tag": "0006_sitemap_links_target_kind",
+      "breakpoints": true
+    }
+  ]
+}

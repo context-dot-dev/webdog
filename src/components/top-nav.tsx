@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/dashboard", label: "Websites" },
   { href: "/dashboard/alerts", label: "Alerts" },
+  { href: "/dashboard/settings", label: "Settings" },
 ];
 
 export function TopNav({ className = "" }: { className?: string }) {

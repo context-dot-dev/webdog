@@ -19,7 +19,7 @@ export function DeleteWebsiteButton({ websiteId }: { websiteId: string }) {
   }
 
   return (
-    <button type="button" onClick={remove} disabled={busy} className="btn-ghost text-xs px-2 py-1">
+    <button type="button" onClick={remove} disabled={busy} className="btn-ghost text-xs px-2 py-1.5">
       {busy ? "Deleting…" : "Delete website"}
     </button>
   );
