@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 import * as schema from "./schema";
@@ -11,15 +12,39 @@ function resolveDatabaseUrl(): string {
   return "./data/web-watchdog.db";
 }
 
-const dbUrl = resolveDatabaseUrl();
-const dbPath = path.isAbsolute(dbUrl) ? dbUrl : path.join(process.cwd(), dbUrl);
+type Connection = {
+  sqlite: Database.Database;
+  db: BetterSQLite3Database<typeof schema>;
+};
 
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+let connection: Connection | null = null;
 
-const sqlite = new Database(dbPath);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+function getConnection(): Connection {
+  if (connection) return connection;
 
-export const db = drizzle(sqlite, { schema });
+  const dbUrl = resolveDatabaseUrl();
+  const dbPath = path.isAbsolute(dbUrl) ? dbUrl : path.join(process.cwd(), dbUrl);
+
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+
+  const sqlite = new Database(dbPath);
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("foreign_keys = ON");
+
+  connection = { sqlite, db: drizzle(sqlite, { schema }) };
+  return connection;
+}
+
+export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
+  get(_target, prop) {
+    return (getConnection().db as Record<string | symbol, unknown>)[prop];
+  },
+});
+
 export { schema };
-export const rawSqlite = sqlite;
+
+export const rawSqlite = new Proxy({} as Database.Database, {
+  get(_target, prop) {
+    return (getConnection().sqlite as Record<string | symbol, unknown>)[prop];
+  },
+});
