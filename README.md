@@ -82,7 +82,7 @@ Steps:
 3. Turn on **public networking** and generate a Railway domain (or configure a custom domain).
 4. Set **`CONTEXT_DEV_API_KEY`** (and optional overrides above), then deploy.
 
-Pre-deploy runs `npm run db:migrate`; start runs the worker in the background and `next start` in the foreground. Health checks use `GET /api/health`.
+Start runs `npm run db:migrate` (SQLite needs the mounted `/data` volume in the main app container), then the worker in the background and `next start` in the foreground. Health checks use `GET /api/health`.
 
 ### Manual / non-template deploy
 
