@@ -37,7 +37,7 @@ function getConnection(): Connection {
 
 export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
   get(_target, prop) {
-    return (getConnection().db as Record<string | symbol, unknown>)[prop];
+    return (getConnection().db as unknown as Record<string | symbol, unknown>)[prop];
   },
 });
 
@@ -45,6 +45,6 @@ export { schema };
 
 export const rawSqlite = new Proxy({} as Database.Database, {
   get(_target, prop) {
-    return (getConnection().sqlite as Record<string | symbol, unknown>)[prop];
+    return (getConnection().sqlite as unknown as Record<string | symbol, unknown>)[prop];
   },
 });
