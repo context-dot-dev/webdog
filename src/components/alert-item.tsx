@@ -28,10 +28,13 @@ function alertTitleForDisplay(title: string): string {
 export function AlertItem({
   alert,
   highlighted,
+  scrollToDiff,
   website,
 }: {
   alert: Alert;
   highlighted?: boolean;
+  /** Deep-link hint (e.g. `?diff=1` on `/dashboard/alerts`): scroll expanded diff into view. */
+  scrollToDiff?: boolean;
   /** When set (e.g. global alerts page), include site in the one-line summary row. */
   website?: { id: string; name: string; domain: string };
 }) {
@@ -42,10 +45,17 @@ export function AlertItem({
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (highlighted && ref.current) {
-      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!highlighted || !ref.current) return;
+    if (scrollToDiff && expanded) {
+      const id = window.setTimeout(() => {
+        const anchor = document.getElementById(`alert-diff-${alert.id}`);
+        if (anchor) anchor.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        else ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
+      return () => clearTimeout(id);
     }
-  }, [highlighted]);
+    ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlighted, scrollToDiff, expanded, alert.id]);
 
   const details = safeParse(alert.details);
 
@@ -130,14 +140,21 @@ export function AlertItem({
       </div>
       {expanded && (
         <div className={`border-t border-neutral-950/[0.05] pb-4 pt-3 ${rowPx}`}>
-          <DetailsView details={details} />
+          <DetailsView details={details} diffAnchorAlertId={alert.id} />
         </div>
       )}
     </li>
   );
 }
 
-function DetailsView({ details }: { details: AlertDetails }) {
+function DetailsView({
+  details,
+  diffAnchorAlertId,
+}: {
+  details: AlertDetails;
+  diffAnchorAlertId?: string;
+}) {
+  const diffAnchor = diffAnchorAlertId ? `alert-diff-${diffAnchorAlertId}` : undefined;
   return (
     <div className="mt-3 space-y-3 text-sm">
       {details.added && details.added.length > 0 && (
@@ -169,11 +186,13 @@ function DetailsView({ details }: { details: AlertDetails }) {
         />
       )}
       {details.diffPreview && (
-        <DiffPreview
-          raw={details.diffPreview}
-          totalAdded={details.totalAdded}
-          totalRemoved={details.totalRemoved}
-        />
+        <div id={diffAnchor}>
+          <DiffPreview
+            raw={details.diffPreview}
+            totalAdded={details.totalAdded}
+            totalRemoved={details.totalRemoved}
+          />
+        </div>
       )}
     </div>
   );

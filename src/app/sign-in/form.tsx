@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
 
 export function SignInForm({ className = "" }: { className?: string }) {
   const router = useRouter();
@@ -11,18 +12,25 @@ export function SignInForm({ className = "" }: { className?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const res = await authClient.signIn.email({ email, password });
-    setLoading(false);
-    if (res.error) {
-      setError(res.error.message ?? "Sign in failed");
-      return;
-    }
-    router.push("/dashboard");
-    router.refresh();
+    void (async () => {
+      try {
+        const res = await authClient.signIn.email({ email, password });
+        if (res.error) {
+          setError(res.error.message ?? "Sign in failed");
+          return;
+        }
+        router.push("/dashboard");
+        router.refresh();
+      } catch (caught) {
+        setError(caughtUnknownMessage(caught));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }
 
   return (

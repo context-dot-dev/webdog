@@ -18,11 +18,12 @@ export default async function WebsiteDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ alert?: string }>;
+  searchParams: Promise<{ alert?: string; diff?: string }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
-  const { alert: highlightedAlertId } = await searchParams;
+  const { alert: highlightedAlertId, diff: diffParam } = await searchParams;
+  const wantDiffScroll = diffParam === "1" || diffParam === "true";
 
   const [website] = await db
     .select()
@@ -201,7 +202,12 @@ export default async function WebsiteDetailPage({
         ) : (
           <ul role="list" className="mt-4 divide-y divide-neutral-950/5 overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-950/5">
             {alerts.map((a) => (
-              <AlertItem key={a.id} alert={a} highlighted={a.id === highlightedAlertId} />
+              <AlertItem
+                key={a.id}
+                alert={a}
+                highlighted={a.id === highlightedAlertId}
+                scrollToDiff={Boolean(wantDiffScroll && a.id === highlightedAlertId)}
+              />
             ))}
           </ul>
         )}

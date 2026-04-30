@@ -15,6 +15,23 @@ import { formatProductPrice } from "@/lib/product-price-history";
 
 const FREQUENCY_PRESETS_HOURS = [1, 6, 12, 24, 48, 168] as const;
 
+/** Full URL for the link; label is path+query+hash when same host as the website, else the full URL. */
+function targetUrlPresentation(websiteUrl: string, pageUrl: string | null): { href: string; label: string } {
+  const href = (pageUrl?.trim() || websiteUrl).trim();
+  try {
+    const u = new URL(href);
+    const base = new URL(websiteUrl);
+    if (u.origin === base.origin) {
+      const path = `${u.pathname}${u.search}${u.hash}`;
+      const isRoot = u.pathname === "/" && u.search === "" && u.hash === "";
+      return { href, label: isRoot ? href : path || "/" };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { href, label: href };
+}
+
 function channelLabel(c: NotificationChannel): string {
   if (c === "SLACK") return "Slack";
   if (c === "EMAIL") return "Email";
@@ -130,6 +147,7 @@ export function TargetRow({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [expandedFetchId, setExpandedFetchId] = useState<string | null>(null);
   const showPriceCol = target.kind === "PRODUCT_PRICE";
+  const { href: targetHref, label: targetLabel } = targetUrlPresentation(websiteUrl, target.pageUrl);
 
   const hourOptions = (() => {
     const set = new Set<number>([...FREQUENCY_PRESETS_HOURS, checkIntervalHours]);
@@ -221,12 +239,13 @@ export function TargetRow({
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
           <KindBadge kind={target.kind} />
           <a
-            href={websiteUrl}
+            href={targetHref}
             target="_blank"
             rel="noreferrer noopener"
+            title={targetHref}
             className="min-w-0 truncate font-mono text-xs text-brand-800 hover:underline"
           >
-            {websiteUrl}
+            {targetLabel}
           </a>
           <div className="shrink-0 text-xs text-neutral-500 sm:ml-0">
             {target.lastCheckedAt ? (

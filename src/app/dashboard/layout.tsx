@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
 import { LogoMark } from "@/components/logo";
 import { MobileNav } from "@/components/mobile-nav";
@@ -7,6 +11,23 @@ import { HeaderUserMenu } from "@/components/header-user-menu";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+
+  const [profile] = await db
+    .select({
+      dismissed: schema.user.contextIntroDismissedAt,
+      avatarLogoUrl: schema.userNotificationSettings.accountBrandLogoUrl,
+    })
+    .from(schema.user)
+    .leftJoin(
+      schema.userNotificationSettings,
+      eq(schema.userNotificationSettings.userId, schema.user.id),
+    )
+    .where(eq(schema.user.id, user.id))
+    .limit(1);
+
+  if (!profile?.dismissed) {
+    redirect("/onboarding/context-dev");
+  }
 
   return (
     <div className="isolate min-h-dvh bg-neutral-50/50 antialiased">
@@ -26,10 +47,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <TopNav className="hidden lg:flex" />
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden lg:block">
-              <HeaderUserMenu user={{ name: user.name, email: user.email }} />
+              <HeaderUserMenu user={{ name: user.name, email: user.email }} avatarLogoUrl={profile.avatarLogoUrl} />
             </div>
             <div className="lg:hidden">
-              <MobileNav user={{ name: user.name, email: user.email }} />
+              <MobileNav user={{ name: user.name, email: user.email }} avatarLogoUrl={profile.avatarLogoUrl} />
             </div>
           </div>
         </div>

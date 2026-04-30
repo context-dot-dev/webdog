@@ -68,7 +68,7 @@ export function ContextDevSettings({
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 autoComplete="off"
-                placeholder="ctx_…"
+                placeholder="brand_…"
                 className="input box-border h-9 min-h-0 min-w-0 flex-1 !py-0 font-mono text-xs leading-9"
               />
               <div className="flex h-9 min-h-9 shrink-0 items-center gap-2">

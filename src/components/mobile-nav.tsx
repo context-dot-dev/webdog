@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
 
 const links = [
   { href: "/dashboard", label: "Websites" },
@@ -11,17 +12,31 @@ const links = [
   { href: "/dashboard/settings", label: "Settings" },
 ];
 
-export function MobileNav({ user }: { user: { name: string; email: string } }) {
+export function MobileNav({
+  user,
+  avatarLogoUrl,
+}: {
+  user: { name: string; email: string };
+  avatarLogoUrl?: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
-  async function onSignOut() {
+  function onSignOut() {
     setLoading(true);
-    await authClient.signOut();
-    router.push("/sign-in");
-    router.refresh();
+    void (async () => {
+      try {
+        await authClient.signOut();
+        router.push("/sign-in");
+        router.refresh();
+      } catch (caught) {
+        console.error(caughtUnknownMessage(caught));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }
 
   return (
@@ -79,14 +94,24 @@ export function MobileNav({ user }: { user: { name: string; email: string } }) {
               })}
             </nav>
             <div className="flex items-center gap-3 border-t border-neutral-950/5 p-3">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-xs font-medium text-white">
-                {user.name
-                  .split(" ")
-                  .map((s) => s[0])
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase() || "?"}
+              <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-medium text-white">
+                {avatarLogoUrl ? (
+                  <img
+                    src={avatarLogoUrl}
+                    alt=""
+                    className="size-full object-cover"
+                    width={32}
+                    height={32}
+                  />
+                ) : (
+                  user.name
+                    .split(" ")
+                    .map((s) => s[0])
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase() || "?"
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-neutral-900">{user.name}</div>

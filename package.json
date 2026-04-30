@@ -1,6 +1,7 @@
 {
   "name": "web-watchdog",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "description": "Open-source website change monitoring — scrape, diff, notify.",
   "engines": {
@@ -23,7 +24,7 @@
     "dotenv": "^16.4.7",
     "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.45.2",
-    "next": "15.1.4",
+    "next": "^15.1.11",
     "node-cron": "^3.0.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",

@@ -25,7 +25,9 @@ export default async function SignInPage() {
             </Link>
           </p>
         </div>
-        <p className="text-xs text-neutral-500">&copy; {new Date().getFullYear()} Web Watchdog</p>
+        <p className="text-xs text-neutral-500">
+          &copy; {new Date().getFullYear()} Context.dev. Distributed under the MIT License.
+        </p>
       </div>
       <AsidePanel />
     </main>
@@ -40,14 +42,14 @@ function AsidePanel() {
       <div className="relative flex h-full flex-col justify-between p-12">
         <div />
         <div>
-          <blockquote className="max-w-[34ch] text-balance text-2xl font-medium tracking-tight">
-            &ldquo;We replaced our ad-hoc scrapers with a single Web Watchdog instance and never looked back.&rdquo;
-          </blockquote>
-          <div className="mt-6 text-sm text-neutral-400">Every change, in one place.</div>
+          <p className="max-w-[34ch] text-balance text-2xl font-medium tracking-tight">
+            Screenshots and diffs when the pages you rely on change, without another brittle scraper.
+          </p>
+          <div className="mt-6 text-sm text-neutral-400">Proudly open source.</div>
         </div>
         <div className="flex items-center gap-3 text-xs text-neutral-400">
           <span className="inline-flex size-2 rounded-full bg-brand-500 shadow-[0_0_0_4px_rgba(255,90,31,0.2)]" />
-          Watching 12,849 pages right now
+          Get notified on every change
         </div>
       </div>
     </aside>

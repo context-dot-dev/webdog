@@ -314,6 +314,69 @@ export async function retrieveBrand(
   return res.brand;
 }
 
+/**
+ * Retrieves brand assets from the signup email domain, or reports freemail/disposable (422).
+ * Does not fall back to `CONTEXT_DEV_API_KEY` — callers must pass the submitted key.
+ * @see https://docs.context.dev/api-reference/brand-intelligence/retrieve-brand-data-by-email-address.md
+ */
+export async function tryRetrieveBrandByEmail(
+  email: string,
+  bearerToken: string,
+): Promise<{ outcome: "brand"; brand: BrandData } | { outcome: "free_or_disposable" }> {
+  const key = bearerToken.trim();
+  if (!key) {
+    throw new ContextDevError("API key required", 400);
+  }
+
+  const url = new URL(`${API_BASE}/brand/retrieve-by-email`);
+  url.searchParams.set("email", email.trim());
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (res.status === 422) {
+    let errorCode: string | undefined;
+    let message = `context.dev responded 422`;
+    try {
+      const body = (await res.json()) as { error_code?: string; message?: string };
+      errorCode = body?.error_code;
+      if (body?.message) message = body.message;
+    } catch {
+      /* non-JSON */
+    }
+    if (errorCode === "FREE_EMAIL_DETECTED" || errorCode === "DISPOSABLE_EMAIL_DETECTED") {
+      return { outcome: "free_or_disposable" };
+    }
+    throw new ContextDevError(message, 422, errorCode);
+  }
+
+  if (!res.ok) {
+    let message = `context.dev responded ${res.status}`;
+    let code: string | undefined;
+    try {
+      const body = (await res.json()) as { message?: string; error_code?: string };
+      if (body?.message) message = body.message;
+      code = body?.error_code;
+    } catch {
+      /* ignore */
+    }
+    throw new ContextDevError(message, res.status, code);
+  }
+
+  const data = (await res.json()) as RetrieveBrandResponse;
+  return { outcome: "brand", brand: data.brand };
+}
+
+/** Confirms an API key is valid when retrieve-by-email is not usable (freemail/disposable inbox). */
+export async function smokeVerifyContextApiKey(apiKey: string): Promise<void> {
+  await retrieveBrand("example.com", { apiKey });
+}
+
 export interface BrandAssets {
   title: string | null;
   description: string | null;

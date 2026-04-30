@@ -3,8 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
 
-export function HeaderUserMenu({ user }: { user: { name: string; email: string } }) {
+export function HeaderUserMenu({
+  user,
+  avatarLogoUrl,
+}: {
+  user: { name: string; email: string };
+  avatarLogoUrl?: string | null;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,11 +41,19 @@ export function HeaderUserMenu({ user }: { user: { name: string; email: string }
     };
   }, [open]);
 
-  async function onSignOut() {
+  function onSignOut() {
     setLoading(true);
-    await authClient.signOut();
-    router.push("/sign-in");
-    router.refresh();
+    void (async () => {
+      try {
+        await authClient.signOut();
+        router.push("/sign-in");
+        router.refresh();
+      } catch (caught) {
+        console.error(caughtUnknownMessage(caught));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }
 
   return (
@@ -49,9 +64,13 @@ export function HeaderUserMenu({ user }: { user: { name: string; email: string }
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Account menu for ${user.name}`}
-        className="flex size-8 items-center justify-center rounded-full bg-neutral-900 text-xs font-medium text-white transition hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+        className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-medium text-white transition hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
       >
-        {initials || "?"}
+        {avatarLogoUrl ? (
+          <img src={avatarLogoUrl} alt="" className="size-full object-cover" width={32} height={32} />
+        ) : (
+          initials || "?"
+        )}
       </button>
       {open && (
         <div
@@ -65,7 +84,7 @@ export function HeaderUserMenu({ user }: { user: { name: string; email: string }
           <div className="p-1">
             <button
               type="button"
-              onClick={onSignOut}
+              onClick={() => onSignOut()}
               disabled={loading}
               role="menuitem"
               className="flex w-full items-center rounded-lg px-2.5 py-1.5 text-sm text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"

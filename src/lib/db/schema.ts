@@ -11,6 +11,8 @@ export const user = sqliteTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: integer("emailVerified", { mode: "boolean" }).notNull().default(false),
   image: text("image"),
+  /** Set when user finishes or defers Context.dev onboarding; null means gate /dashboard. */
+  contextIntroDismissedAt: integer("contextIntroDismissedAt", { mode: "timestamp_ms" }),
   createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
 });
@@ -64,6 +66,8 @@ export const userNotificationSettings = sqliteTable("userNotificationSettings", 
     .references(() => user.id, { onDelete: "cascade" }),
   /** Overrides process.env.CONTEXT_DEV_API_KEY for this user’s scrapes and brand fetch. */
   contextDevApiKey: text("contextDevApiKey"),
+  /** Hotlinked brand icon URL from Context.dev (e.g. dashboard avatar). */
+  accountBrandLogoUrl: text("accountBrandLogoUrl"),
   /** Shared Resend API key for all EMAIL destinations. */
   resendApiKey: text("resendApiKey"),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" })

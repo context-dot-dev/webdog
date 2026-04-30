@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
 
 export function SignUpForm({ className = "" }: { className?: string }) {
   const router = useRouter();
@@ -12,18 +13,25 @@ export function SignUpForm({ className = "" }: { className?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const res = await authClient.signUp.email({ name, email, password });
-    setLoading(false);
-    if (res.error) {
-      setError(res.error.message ?? "Sign up failed");
-      return;
-    }
-    router.push("/dashboard");
-    router.refresh();
+    void (async () => {
+      try {
+        const res = await authClient.signUp.email({ name, email, password });
+        if (res.error) {
+          setError(res.error.message ?? "Sign up failed");
+          return;
+        }
+        router.push("/onboarding/context-dev");
+        router.refresh();
+      } catch (caught) {
+        setError(caughtUnknownMessage(caught));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }
 
   return (

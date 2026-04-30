@@ -25,7 +25,9 @@ export default async function SignUpPage() {
             </Link>
           </p>
         </div>
-        <p className="text-xs text-neutral-500">&copy; {new Date().getFullYear()} Web Watchdog</p>
+        <p className="text-xs text-neutral-500">
+          &copy; {new Date().getFullYear()} Context.dev. Distributed under the MIT License.
+        </p>
       </div>
       <aside className="relative hidden overflow-hidden bg-neutral-950 text-white lg:block">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,90,31,0.25),transparent_60%)]" />

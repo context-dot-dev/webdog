@@ -29,7 +29,7 @@ export type NewAlertsWebhookBody = {
   kind: "new_alerts";
   appBaseUrl: string;
   site: NewAlertsSite;
-  alerts: NewAlertsAlert[];
+  alerts: (NewAlertsAlert & { dashboardUrl: string })[];
   /** Same human-readable summary as the Slack fallback text / email. */
   summaryText: string;
 };
@@ -66,6 +66,11 @@ function trunc(s: string, max: number): string {
 /** Escape Slack mrkdwn HTML entities (safe inside ~…~ and _…_ spans). */
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Text inside Slack `<url|label>` cannot contain `|` (breaks the link grammar). */
+function escSlackLinkLabel(s: string): string {
+  return esc(s).replace(/\|/g, " · ");
 }
 
 /**
@@ -131,8 +136,12 @@ function buildDiffMrkdwnLines(
   return { lines: parts, hasMore, totalChanges };
 }
 
-function alertUrl(appBaseUrl: string, siteId: string, alertId: string): string {
-  return new URL(`/dashboard/websites/${siteId}?alert=${alertId}`, appBaseUrl).toString();
+/** Deep-link to the global Alerts screen: expands the row and reveals the diff. */
+export function alertDashboardDeepLink(appBaseUrl: string, alertId: string): string {
+  const u = new URL("/dashboard/alerts", appBaseUrl);
+  u.searchParams.set("alert", alertId);
+  u.searchParams.set("diff", "1");
+  return u.toString();
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +166,10 @@ export function buildNewAlertsPayload(
 export function buildNewAlertsSlackBlocks(payload: NewAlertsPayload): SlackBlock[] {
   const { appBaseUrl, site, alerts } = payload;
   const n = alerts.length;
-  const openUrl = new URL(`/dashboard/websites/${site.id}`, appBaseUrl).toString();
+  const openUrl =
+    n > 0
+      ? alertDashboardDeepLink(appBaseUrl, alerts[0].id)
+      : new URL("/dashboard/alerts", appBaseUrl).toString();
   const maxAlerts = 5;
 
   const blocks: SlackBlock[] = [
@@ -182,9 +194,9 @@ export function buildNewAlertsSlackBlocks(payload: NewAlertsPayload): SlackBlock
     blocks.push({ type: "divider" });
 
     const { lines: diffLines, hasMore, totalChanges } = buildDiffMrkdwnLines(a);
-    const url = alertUrl(appBaseUrl, site.id, a.id);
+    const url = alertDashboardDeepLink(appBaseUrl, a.id);
 
-    let sectionText = `*${esc(trunc(a.title, 200))}*`;
+    let sectionText = `*<${url}|${escSlackLinkLabel(trunc(a.title, 200))}>*`;
     if (diffLines.length > 0) sectionText += "\n" + diffLines.join("\n");
 
     blocks.push({ type: "section", text: { type: "mrkdwn", text: sectionText } });
@@ -230,21 +242,21 @@ export function buildNewAlertsSlackBlocks(payload: NewAlertsPayload): SlackBlock
 export function formatNewAlertsSlackText(payload: NewAlertsPayload): string {
   const { appBaseUrl, site, alerts } = payload;
   const n = alerts.length;
-  const openUrl = new URL(`/dashboard/websites/${site.id}`, appBaseUrl).toString();
+  const openUrl =
+    n > 0
+      ? alertDashboardDeepLink(appBaseUrl, alerts[0].id)
+      : new URL("/dashboard/alerts", appBaseUrl).toString();
   const maxAlerts = 5;
 
   const lines = alerts
     .slice(0, maxAlerts)
     .map((a) => {
       const { lines: diffLines, hasMore, totalChanges } = buildDiffMrkdwnLines(a);
-      let text = `• ${trunc(a.title, 200)}`;
+      const deep = alertDashboardDeepLink(appBaseUrl, a.id);
+      let text = `• ${trunc(a.title, 200)}\n<${deep}|Open alert & diff>`;
       if (diffLines.length > 0) {
-        const url = alertUrl(appBaseUrl, site.id, a.id);
         const shown = diffLines.filter((l) => l.startsWith("~") || l.startsWith("_")).length;
-        const suffix =
-          hasMore
-            ? `\n_Showing ${shown} of ${totalChanges} changes_ · <${url}|View all>`
-            : "";
+        const suffix = hasMore ? `\n_Showing ${shown} of ${totalChanges} changes in preview — use Open above for full diff._` : "";
         text += "\n" + diffLines.join("\n") + suffix;
       }
       return text;
@@ -256,13 +268,17 @@ export function formatNewAlertsSlackText(payload: NewAlertsPayload): string {
 }
 
 export function buildNewAlertsWebhookBody(payload: NewAlertsPayload): NewAlertsWebhookBody {
+  const { appBaseUrl, alerts } = payload;
   return {
     type: "web_watchdog.new_alerts",
     version: 1,
     kind: payload.kind,
-    appBaseUrl: payload.appBaseUrl,
+    appBaseUrl,
     site: payload.site,
-    alerts: payload.alerts,
+    alerts: alerts.map((a) => ({
+      ...a,
+      dashboardUrl: alertDashboardDeepLink(appBaseUrl, a.id),
+    })),
     summaryText: formatNewAlertsSlackText(payload),
   };
 }
@@ -275,17 +291,21 @@ export function formatNewAlertsEmailSubject(payload: NewAlertsPayload): string {
 export function formatNewAlertsEmailText(payload: NewAlertsPayload): string {
   const { appBaseUrl, site, alerts } = payload;
   const n = alerts.length;
-  const openUrl = new URL(`/dashboard/websites/${site.id}`, appBaseUrl).toString();
+  const openUrl =
+    n > 0
+      ? alertDashboardDeepLink(appBaseUrl, alerts[0].id)
+      : new URL("/dashboard/alerts", appBaseUrl).toString();
   const maxAlerts = 5;
 
   const lines = alerts
     .slice(0, maxAlerts)
     .map((a) => {
+      const deeplink = alertDashboardDeepLink(appBaseUrl, a.id);
       const { addLines, delLines, totalChanges } = parseDiffLines(a);
-      if (totalChanges === 0) return `• ${trunc(a.title, 200)}`;
+      if (totalChanges === 0) return `• ${trunc(a.title, 200)}\n  Open in app: ${deeplink}`;
 
       const hasMore = totalChanges > INLINE_CHANGE_LIMIT;
-      const parts: string[] = [`• ${trunc(a.title, 200)}`];
+      const parts: string[] = [`• ${trunc(a.title, 200)}`, `  Open in app: ${deeplink}`];
 
       if (!hasMore) {
         const k = Math.min(addLines.length, delLines.length);
@@ -299,8 +319,7 @@ export function formatNewAlertsEmailText(payload: NewAlertsPayload): string {
         const shownCount = (delLines[0] ? 1 : 0) + (addLines[0] ? 1 : 0);
         if (delLines[0]) parts.push(`  - ${delLines[0]}`);
         if (addLines[0]) parts.push(`  + ${addLines[0]}`);
-        const url = alertUrl(appBaseUrl, site.id, a.id);
-        parts.push(`  Showing ${shownCount} of ${totalChanges} changes — View all: ${url}`);
+        parts.push(`  Showing ${shownCount} of ${totalChanges} line changes above — full diff in app (same link)`);
       }
 
       return parts.join("\n");

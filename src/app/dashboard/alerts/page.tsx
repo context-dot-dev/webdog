@@ -4,8 +4,14 @@ import * as schema from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
 import { AlertItem } from "@/components/alert-item";
 
-export default async function AlertsPage() {
+export default async function AlertsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ alert?: string; diff?: string }>;
+}) {
   const user = await requireUser();
+  const { alert: alertParam, diff: diffParam } = await searchParams;
+  const wantDiffScroll = diffParam === "1" || diffParam === "true";
 
   const rows = await db
     .select({
@@ -43,6 +49,8 @@ export default async function AlertsPage() {
               <AlertItem
                 key={alert.id}
                 alert={alert}
+                highlighted={alertParam !== undefined && alert.id === alertParam}
+                scrollToDiff={wantDiffScroll && alertParam === alert.id}
                 website={{
                   id: websiteId,
                   name: websiteName,
