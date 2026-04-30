@@ -47,10 +47,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <TopNav className="hidden lg:flex" />
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden lg:block">
-              <HeaderUserMenu user={{ name: user.name, email: user.email }} avatarLogoUrl={profile.avatarLogoUrl} />
+              <HeaderUserMenu
+                user={{ name: user.name, email: user.email }}
+                avatarLogoUrl={profile.avatarLogoUrl ?? user.image ?? null}
+              />
             </div>
             <div className="lg:hidden">
-              <MobileNav user={{ name: user.name, email: user.email }} avatarLogoUrl={profile.avatarLogoUrl} />
+              <MobileNav user={{ name: user.name, email: user.email }} avatarLogoUrl={profile.avatarLogoUrl ?? user.image ?? null} />
             </div>
           </div>
         </div>

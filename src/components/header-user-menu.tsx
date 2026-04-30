@@ -25,6 +25,11 @@ export function HeaderUserMenu({
     .join("")
     .toUpperCase();
 
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarLogoUrl]);
+
   useEffect(() => {
     if (!open) return;
     function onDocClick(e: MouseEvent) {
@@ -56,6 +61,8 @@ export function HeaderUserMenu({
     })();
   }
 
+  const showAvatarImg = Boolean(avatarLogoUrl && !avatarFailed);
+
   return (
     <div ref={wrapRef} className="relative">
       <button
@@ -64,10 +71,23 @@ export function HeaderUserMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Account menu for ${user.name}`}
-        className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-medium text-white transition hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+        className={
+          showAvatarImg
+            ? "flex size-8 items-center justify-center overflow-hidden rounded-full bg-white text-xs font-medium ring-1 ring-neutral-950/10 transition hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            : "flex size-8 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-medium text-white transition hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+        }
       >
-        {avatarLogoUrl ? (
-          <img src={avatarLogoUrl} alt="" className="size-full object-cover" width={32} height={32} />
+        {showAvatarImg && avatarLogoUrl ? (
+          <img
+            src={avatarLogoUrl}
+            alt=""
+            className="size-full object-contain p-0.5"
+            width={32}
+            height={32}
+            referrerPolicy="no-referrer"
+            decoding="async"
+            onError={() => setAvatarFailed(true)}
+          />
         ) : (
           initials || "?"
         )}

@@ -384,24 +384,72 @@ export interface BrandAssets {
   backdropUrl: string | null;
 }
 
+function sanitizeBrandAssetUrl(raw: string | undefined | null): string | null {
+  if (typeof raw !== "string") return null;
+  const t = raw.trim();
+  if (t.startsWith("https://") || t.startsWith("http://")) return t;
+  return null;
+}
+
+function brandLogoHref(entry: BrandLogo | null | undefined): string | null {
+  return sanitizeBrandAssetUrl(entry?.url ?? null);
+}
+
 export function pickBrandAssets(
   brand: BrandData | null | undefined,
+  options?: {
+    /** When true and no usable logo URLs exist, use the first backdrop (avatar-only fallback). */
+    useBackdropWhenNoLogo?: boolean;
+  },
 ): BrandAssets {
   if (!brand)
     return { title: null, description: null, logoUrl: null, backdropUrl: null };
   const logos = brand.logos ?? [];
+  /** Dashboard avatar sits on neutral-950; dark / opaque logos read best there first. */
   const pickedLogo =
-    logos.find((l) => l.type === "icon" && l.mode === "light") ??
-    logos.find((l) => l.type === "icon" && l.mode !== "dark") ??
-    logos.find((l) => l.type === "icon") ??
-    logos.find((l) => l.mode !== "dark") ??
-    logos[0] ??
+    logos.find((l) => brandLogoHref(l) && l.type === "icon" && l.mode === "dark") ??
+    logos.find(
+      (l) => brandLogoHref(l) && l.type === "icon" && l.mode === "has_opaque_background",
+    ) ??
+    logos.find((l) => brandLogoHref(l) && l.type === "icon" && l.mode === "light") ??
+    logos.find((l) => brandLogoHref(l) && l.type === "icon" && l.mode !== "dark") ??
+    logos.find((l) => brandLogoHref(l) && l.type === "icon") ??
+    logos.find((l) => brandLogoHref(l) && l.mode !== "dark") ??
+    logos.find((l) => brandLogoHref(l)) ??
     null;
-  const backdrop = (brand.backdrops ?? [])[0] ?? null;
+  const backdrop =
+    (brand.backdrops ?? []).find((b) => sanitizeBrandAssetUrl(b.url)) ?? (brand.backdrops ?? [])[0] ?? null;
+  const backdropUrl = sanitizeBrandAssetUrl(backdrop?.url ?? null);
+  let logoUrl = brandLogoHref(pickedLogo);
+  if (!logoUrl && options?.useBackdropWhenNoLogo && backdropUrl) logoUrl = backdropUrl;
   return {
     title: brand.title?.trim() || null,
     description: brand.description?.trim() || null,
-    logoUrl: pickedLogo?.url ?? null,
-    backdropUrl: backdrop?.url ?? null,
+    logoUrl,
+    backdropUrl,
   };
+}
+
+/**
+ * Best image URL for the signed-in user's dashboard avatar (Context.dev CDN).
+ * Returns null when the inbox is disposable/freemail (retrieve-by-email is unavailable).
+ */
+export async function resolveAccountBrandLogoUrl(
+  sessionEmail: string | null | undefined,
+  bearerToken: string,
+): Promise<string | null> {
+  const key = bearerToken.trim();
+  if (!key) return null;
+  const email = sessionEmail?.trim();
+  if (!email) {
+    await smokeVerifyContextApiKey(key);
+    return null;
+  }
+
+  const byEmail = await tryRetrieveBrandByEmail(email, key);
+  if (byEmail.outcome === "brand") {
+    return pickBrandAssets(byEmail.brand, { useBackdropWhenNoLogo: true }).logoUrl;
+  }
+  await smokeVerifyContextApiKey(key);
+  return null;
 }

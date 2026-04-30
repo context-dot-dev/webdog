@@ -1,12 +1,14 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export function ContextDevSettings({
   initialContextDevApiKey,
 }: {
   initialContextDevApiKey: string | null;
 }) {
+  const router = useRouter();
   const id = useId();
   const [key, setKey] = useState(() => initialContextDevApiKey ?? "");
   const [saving, setSaving] = useState(false);
@@ -30,6 +32,7 @@ export function ContextDevSettings({
         return;
       }
       setSavedFlash(true);
+      router.refresh();
       window.setTimeout(() => setSavedFlash(false), 3000);
     } catch {
       setError("Save failed");

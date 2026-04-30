@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
 
@@ -24,6 +24,11 @@ export function MobileNav({
   const router = useRouter();
   const pathname = usePathname();
 
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarLogoUrl]);
+
   function onSignOut() {
     setLoading(true);
     void (async () => {
@@ -38,6 +43,8 @@ export function MobileNav({
       }
     })();
   }
+
+  const showAvatarImg = Boolean(avatarLogoUrl && !avatarFailed);
 
   return (
     <>
@@ -94,14 +101,23 @@ export function MobileNav({
               })}
             </nav>
             <div className="flex items-center gap-3 border-t border-neutral-950/5 p-3">
-              <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-medium text-white">
-                {avatarLogoUrl ? (
+            <div
+              className={
+                showAvatarImg
+                  ? "flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-neutral-950/10"
+                  : "flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-medium text-white"
+              }
+            >
+                {showAvatarImg && avatarLogoUrl ? (
                   <img
                     src={avatarLogoUrl}
                     alt=""
-                    className="size-full object-cover"
+                    className="size-full object-contain p-0.5"
                     width={32}
                     height={32}
+                    referrerPolicy="no-referrer"
+                    decoding="async"
+                    onError={() => setAvatarFailed(true)}
                   />
                 ) : (
                   user.name

@@ -2,12 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getApiUser, badRequest, parseJson } from "@/lib/api";
-import {
-  ContextDevError,
-  pickBrandAssets,
-  smokeVerifyContextApiKey,
-  tryRetrieveBrandByEmail,
-} from "@/lib/context-client";
+import { ContextDevError, resolveAccountBrandLogoUrl } from "@/lib/context-client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
@@ -60,16 +55,8 @@ export async function POST(req: Request) {
     return badRequest("Enter your Context.dev API key");
   }
 
-  let accountBrandLogoUrl: string | null = null;
-
   try {
-    const byEmail = await tryRetrieveBrandByEmail(sessionUser.email, trimmedKey);
-
-    if (byEmail.outcome === "brand") {
-      accountBrandLogoUrl = pickBrandAssets(byEmail.brand).logoUrl;
-    } else {
-      await smokeVerifyContextApiKey(trimmedKey);
-    }
+    const accountBrandLogoUrl = await resolveAccountBrandLogoUrl(sessionUser.email, trimmedKey);
 
     db.transaction((tx) => {
       tx.insert(schema.userNotificationSettings)
@@ -86,14 +73,16 @@ export async function POST(req: Request) {
             accountBrandLogoUrl,
             updatedAt: now,
           },
-        });
+        })
+        .run();
 
       tx.update(schema.user)
         .set({
           contextIntroDismissedAt: now,
           updatedAt: now,
         })
-        .where(eq(schema.user.id, sessionUser.id));
+        .where(eq(schema.user.id, sessionUser.id))
+        .run();
     });
 
     return NextResponse.json({

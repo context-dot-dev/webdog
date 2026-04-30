@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { getApiUser, badRequest, parseJson } from "@/lib/api";
+import { ContextDevError, resolveAccountBrandLogoUrl } from "@/lib/context-client";
 
 const patchSchema = z.object({
   contextDevApiKey: z.union([z.string(), z.null()]).optional(),
@@ -72,6 +73,25 @@ export async function PATCH(req: Request) {
     resendKey = normalizeResendApiKey(resendIn);
   }
 
+  let refreshedBrandLogoUrl: string | null | undefined;
+  if (keyIn !== undefined) {
+    if (!contextKey) {
+      refreshedBrandLogoUrl = null;
+    } else if (!user.email) {
+      return badRequest("Add an email to your account before saving a Context.dev key");
+    } else {
+      try {
+        refreshedBrandLogoUrl = await resolveAccountBrandLogoUrl(user.email, contextKey);
+      } catch (e) {
+        if (e instanceof ContextDevError) {
+          const status = e.status === 401 || e.status === 403 ? e.status : 400;
+          return NextResponse.json({ error: e.message }, { status });
+        }
+        throw e;
+      }
+    }
+  }
+
   const now = new Date();
 
   await db
@@ -81,11 +101,22 @@ export async function PATCH(req: Request) {
       contextDevApiKey: contextKey,
       resendApiKey: resendKey,
       updatedAt: now,
+      ...(refreshedBrandLogoUrl !== undefined ? { accountBrandLogoUrl: refreshedBrandLogoUrl } : {}),
     })
     .onConflictDoUpdate({
       target: schema.userNotificationSettings.userId,
-      set: { contextDevApiKey: contextKey, resendApiKey: resendKey, updatedAt: now },
+      set: {
+        contextDevApiKey: contextKey,
+        resendApiKey: resendKey,
+        updatedAt: now,
+        ...(refreshedBrandLogoUrl !== undefined ? { accountBrandLogoUrl: refreshedBrandLogoUrl } : {}),
+      },
     });
 
-  return NextResponse.json({ ok: true, contextDevApiKey: contextKey, resendApiKey: resendKey });
+  return NextResponse.json({
+    ok: true,
+    contextDevApiKey: contextKey,
+    resendApiKey: resendKey,
+    ...(refreshedBrandLogoUrl !== undefined ? { accountBrandLogoUrl: refreshedBrandLogoUrl } : {}),
+  });
 }
