@@ -12,6 +12,7 @@ import { newId } from "./ids";
 import type { AlertKind, NotificationChannel, Target } from "./db/schema";
 import { dispatchNewAlertsForDestinations } from "./dispatch-new-alerts";
 import { resolveDestinationsForTarget } from "./website-notification-destinations";
+import { authPublicBaseUrl } from "./auth";
 import { buildNewAlertsPayload, type NewAlertsAlert } from "./notification-new-alerts";
 
 function sha256(s: string): string {
@@ -240,6 +241,17 @@ export type RunWebsiteChecksOptions = {
   targetId?: string;
 };
 
+/** Pure helper: whether a target should run on this worker tick (not manual / not forced). */
+export function isTargetCheckDue(
+  lastCheckedAt: Date | null | undefined,
+  checkIntervalHours: number | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  const hours = checkIntervalHours ?? 1;
+  const intervalMs = hours * 60 * 60 * 1000;
+  return !lastCheckedAt || nowMs - Number(lastCheckedAt) >= intervalMs;
+}
+
 /**
  * Run all enabled targets for a single website. Writes new snapshots and
  * alert rows as side effects.
@@ -292,11 +304,8 @@ export async function runWebsiteChecks(
   const singleTarget = Boolean(options?.targetId);
 
   for (const t of targets) {
-    if (!singleTarget && !options?.force) {
-      const hours = t.checkIntervalHours ?? 1;
-      const intervalMs = hours * 60 * 60 * 1000;
-      const isDue = !t.lastCheckedAt || Date.now() - Number(t.lastCheckedAt) >= intervalMs;
-      if (!isDue) continue;
+    if (!singleTarget && !options?.force && !isTargetCheckDue(t.lastCheckedAt, t.checkIntervalHours)) {
+      continue;
     }
     try {
       if (t.kind === "SITEMAP_LINKS") {
@@ -360,7 +369,7 @@ export async function runWebsiteChecks(
       .where(inArray(schema.target.id, targetIdList));
     const targetById = new Map(targetRows.map((t) => [t.id, t]));
 
-    const base = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+    const base = authPublicBaseUrl;
     const siteInfo = { id: website.id, name: website.name, domain: website.domain };
 
     const alertsByDestinationId = new Map<string, NewAlertsAlert[]>();

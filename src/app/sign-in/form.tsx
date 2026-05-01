@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { formatCredentialAuthUiError } from "@/lib/auth-ui-error";
 import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
 
 export function SignInForm({ className = "" }: { className?: string }) {
@@ -20,13 +21,15 @@ export function SignInForm({ className = "" }: { className?: string }) {
       try {
         const res = await authClient.signIn.email({ email, password });
         if (res.error) {
-          setError(res.error.message ?? "Sign in failed");
+          setError(
+            formatCredentialAuthUiError(res.error.message ?? "Sign in failed", res.error),
+          );
           return;
         }
         router.push("/dashboard");
         router.refresh();
       } catch (caught) {
-        setError(caughtUnknownMessage(caught));
+        setError(formatCredentialAuthUiError(caughtUnknownMessage(caught)));
       } finally {
         setLoading(false);
       }

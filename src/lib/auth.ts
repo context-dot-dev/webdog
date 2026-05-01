@@ -7,19 +7,116 @@ import * as schema from "./db/schema";
 
 const RAILWAY_AUTH_SECRET_FILE = "/data/.better-auth-secret";
 
+/** Trim slashes; keep a single usable origin-style base for Better Auth. */
+function normalizeAuthBase(urlStr: string): string {
+  const t = urlStr.trim().replace(/\/+$/, "");
+  return t.length > 0 ? t : urlStr.trim();
+}
+
+/** True during `next build` — avoid Railway-only prod checks that need a runtime public URL. */
+function isLikelyNextProductionBuild(): boolean {
+  if (process.env.npm_lifecycle_event === "build") return true;
+  const argvTail = process.argv.slice(1).join(" ");
+  return /\bnext\s+build\b/.test(argvTail);
+}
+
 /**
- * Public URL for Better Auth callbacks. On Railway, defaults to https://$RAILWAY_PUBLIC_DOMAIN
- * when `BETTER_AUTH_URL` is unset (after you enable public networking / generate a domain).
+ * Static canonical base URL (fallback when `BETTER_AUTH_ALLOWED_HOSTS` is unused).
+ * Order on Railway (and locally):
+ * 1. `BETTER_AUTH_URL` if set (overrides Railway; do not use the localhost placeholder on prod).
+ * 2. `https://$RAILWAY_PUBLIC_DOMAIN` — Railway system env (enable public networking / generate a domain).
+ * 3. `NEXT_PUBLIC_APP_URL` origin when `RAILWAY_PROJECT_ID` is set (if `RAILWAY_PUBLIC_DOMAIN` is empty or wrong).
+ * 4. Local dev: `http://localhost:3000`.
+ * `RAILWAY_PRIVATE_DOMAIN` is internal-only; never use it as the public auth URL.
  */
-function resolveAuthBaseURL(): string {
+function resolveStaticAuthBaseURL(): string {
   const explicit = process.env.BETTER_AUTH_URL?.trim();
-  if (explicit) return explicit;
-  const domain = process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
-  if (domain) return `https://${domain}`;
+  if (explicit && explicit !== "http://localhost:3000")
+    return normalizeAuthBase(explicit);
+
+  let domain = process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
+  if (domain) {
+    domain = domain.replace(/^https?:\/\//i, "").replace(/\/+$/, "").split("/")[0] ?? domain;
+    if (domain.length > 0) return normalizeAuthBase(`https://${domain}`);
+  }
+
+  const onRailway = Boolean(process.env.RAILWAY_PROJECT_ID);
+  const nextPublic = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (onRailway && nextPublic) {
+    try {
+      const u = new URL(nextPublic);
+      if (u.protocol === "http:" || u.protocol === "https:")
+        return normalizeAuthBase(u.origin);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (
+    explicit === "http://localhost:3000" &&
+    !(process.env.RAILWAY_PUBLIC_DOMAIN?.trim() || (onRailway && nextPublic))
+  ) {
+    return normalizeAuthBase(explicit);
+  }
+
   return "http://localhost:3000";
 }
 
+/**
+ * Better Auth `baseURL`: either a fixed string or dynamic host allowlist (wildcard patterns),
+ * for multiple hostnames or URLs that change (e.g. `*.up.railway.app` + custom domain).
+ *
+ * Set `BETTER_AUTH_ALLOWED_HOSTS` to comma-separated host patterns (no scheme), e.g.
+ * `*.up.railway.app,myapp.com,www.myapp.com`. The incoming `Host` / `x-forwarded-host` must match.
+ * You still need a non-localhost **fallback** URL on hosted prod (`BETTER_AUTH_URL`, domain env, or `NEXT_PUBLIC_APP_URL`)
+ * for contexts without a request (build, some server calls).
+ */
+function resolveAuthBaseURL():
+  | string
+  | { allowedHosts: string[]; fallback: string; protocol: "auto" } {
+  const raw = process.env.BETTER_AUTH_ALLOWED_HOSTS?.trim();
+  if (raw) {
+    const allowedHosts = raw
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean);
+    if (allowedHosts.length > 0) {
+      return {
+        allowedHosts,
+        fallback: normalizeAuthBase(resolveStaticAuthBaseURL()),
+        protocol: "auto",
+      };
+    }
+  }
+  return resolveStaticAuthBaseURL();
+}
+
 const baseURL = resolveAuthBaseURL();
+
+const isDynamicAuthBase =
+  typeof baseURL === "object" &&
+  baseURL !== null &&
+  "allowedHosts" in baseURL &&
+  Array.isArray(baseURL.allowedHosts);
+
+const authFallbackOrigin =
+  typeof baseURL === "string" ? baseURL : baseURL.fallback;
+
+const isRailwayRuntimeProd =
+  Boolean(process.env.RAILWAY_PROJECT_ID) &&
+  process.env.NODE_ENV === "production" &&
+  !isLikelyNextProductionBuild();
+const fallbackIsLocalhost =
+  authFallbackOrigin.startsWith("http://localhost") ||
+  authFallbackOrigin.startsWith("http://127.0.0.1");
+if (isRailwayRuntimeProd && fallbackIsLocalhost) {
+  const suffix = isDynamicAuthBase
+    ? " When using BETTER_AUTH_ALLOWED_HOSTS, Better Auth still needs BETTER_AUTH_URL (or NEXT_PUBLIC_APP_URL / RAILWAY_PUBLIC_DOMAIN) as a canonical https fallback."
+    : " Set BETTER_AUTH_URL=https://YOUR_PUBLIC_HOST (exact URL users open), or NEXT_PUBLIC_APP_URL when RAILWAY_PUBLIC_DOMAIN is empty. For www vs apex, use BETTER_AUTH_ALLOWED_HOSTS or BETTER_AUTH_TRUSTED_ORIGINS.";
+  throw new Error(
+    "Better Auth has no public base URL on Railway (fallback is still localhost)." + suffix,
+  );
+}
 
 /**
  * `http://localhost` and `http://127.0.0.1` are different origins. The browser
@@ -39,17 +136,11 @@ function loopbackOriginAlt(urlStr: string): string | null {
   }
 }
 
-const extraTrusted = loopbackOriginAlt(baseURL);
+const extraTrusted = loopbackOriginAlt(authFallbackOrigin);
 
 /** Stable random secret for `next build` only; never used at runtime. */
 const NEXT_BUILD_AUTH_PLACEHOLDER =
   "next-build-placeholder-not-used-at-runtime-min-32-chars!!";
-
-function isLikelyNextProductionBuild(): boolean {
-  if (process.env.npm_lifecycle_event === "build") return true;
-  const argvTail = process.argv.slice(1).join(" ");
-  return /\bnext\s+build\b/.test(argvTail);
-}
 
 function railwayPersistedAuthSecret(): string {
   try {
@@ -99,7 +190,29 @@ function resolveAuthSecret(): string {
   return "dev-only-unsafe-betterauth-secret-not-for-production-use";
 }
 
+/** Optional footgun: relax Better Auth URL / origin middleware. Default off. */
+function resolveAuthAdvanced():
+  | { advanced: { disableOriginCheck?: boolean; disableCSRFCheck?: boolean } }
+  | undefined {
+  const offOrigin = process.env.BETTER_AUTH_DISABLE_ORIGIN_CHECK?.trim() === "true";
+  const offCsrf = process.env.BETTER_AUTH_DISABLE_CSRF_CHECK?.trim() === "true";
+  if (!offOrigin && !offCsrf) return undefined;
+
+  const advanced: { disableOriginCheck?: boolean; disableCSRFCheck?: boolean } = {};
+  if (offOrigin) advanced.disableOriginCheck = true;
+  if (offCsrf) advanced.disableCSRFCheck = true;
+  else if (offOrigin)
+    // Without this, Better Auth treats "origin check off" as legacy combined with CSRF off.
+    advanced.disableCSRFCheck = false;
+
+  return { advanced };
+}
+
+/** Same origin resolution as Better Auth non-request fallback (dashboard links in emails/alerts). */
+export const authPublicBaseUrl = authFallbackOrigin;
+
 export const auth = betterAuth({
+  ...resolveAuthAdvanced(),
   database: drizzleAdapter(db, {
     provider: "sqlite",
     schema: {

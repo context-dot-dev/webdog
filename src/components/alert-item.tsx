@@ -76,8 +76,8 @@ export function AlertItem({
 
   const shellCls = [
     "transition-colors",
-    highlighted ? "ring-2 ring-inset ring-brand-400/30" : "",
-    read ? "bg-white" : "bg-brand-50/35",
+    highlighted ? "ring-1 ring-inset ring-neutral-950/10" : "",
+    read ? "bg-white" : "bg-white shadow-[inset_3px_0_0_0_theme(colors.brand.500)]",
     "hover:bg-neutral-950/[0.02]",
   ].join(" ");
 
