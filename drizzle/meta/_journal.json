@@ -57,6 +57,13 @@
       "when": 1777300000000,
       "tag": "0007_context_intro_brand_logo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1777310000000,
+      "tag": "0008_target_next_check_due",
+      "breakpoints": true
     }
   ]
 }

@@ -156,8 +156,10 @@ export const target = sqliteTable(
     /** For PAGE_CONTENT / PRODUCT_PRICE: the page URL. Null for sitemap-based targets. */
     pageUrl: text("pageUrl"),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-    /** How often this target is checked (worker tick is the granularity; must elapse since lastCheckedAt). */
+    /** Minimum spacing between successful checks (hours); worker wakes per SCRAPE_CRON. */
     checkIntervalHours: integer("checkIntervalHours").notNull().default(1),
+    /** Sole eligibility clock for scheduled runs; advanced by fixed interval after success. Null = due immediately. */
+    nextCheckDueAt: integer("nextCheckDueAt", { mode: "timestamp_ms" }),
     lastCheckedAt: integer("lastCheckedAt", { mode: "timestamp_ms" }),
     /** When set, outbound alerts from this target go only here; when null, use website-level routing. */
     notificationDestinationId: text("notificationDestinationId").references(

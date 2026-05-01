@@ -243,13 +243,25 @@ export type RunWebsiteChecksOptions = {
 
 /** Pure helper: whether a target should run on this worker tick (not manual / not forced). */
 export function isTargetCheckDue(
-  lastCheckedAt: Date | null | undefined,
-  checkIntervalHours: number | null | undefined,
+  nextCheckDueAt: Date | null | undefined,
   nowMs: number = Date.now(),
 ): boolean {
-  const hours = checkIntervalHours ?? 1;
-  const intervalMs = hours * 60 * 60 * 1000;
-  return !lastCheckedAt || nowMs - Number(lastCheckedAt) >= intervalMs;
+  return nextCheckDueAt == null || nowMs >= Number(nextCheckDueAt);
+}
+
+/** Advance stored deadline after success; preserves phase; collapses overdue slots without extra scrapes. */
+export function computeNextCheckDueAfterSuccess(
+  storedNextDueAt: Date | null | undefined,
+  checkIntervalHours: number,
+  nowMs: number,
+): Date {
+  const intervalMs = checkIntervalHours * 60 * 60 * 1000;
+  const prev = storedNextDueAt != null ? Number(storedNextDueAt) : nowMs;
+  let next = prev + intervalMs;
+  while (next <= nowMs) {
+    next += intervalMs;
+  }
+  return new Date(next);
 }
 
 /**
@@ -304,7 +316,7 @@ export async function runWebsiteChecks(
   const singleTarget = Boolean(options?.targetId);
 
   for (const t of targets) {
-    if (!singleTarget && !options?.force && !isTargetCheckDue(t.lastCheckedAt, t.checkIntervalHours)) {
+    if (!singleTarget && !options?.force && !isTargetCheckDue(t.nextCheckDueAt)) {
       continue;
     }
     try {
@@ -315,10 +327,33 @@ export async function runWebsiteChecks(
       } else {
         await handleContentTarget(website, t, cache, alerts);
       }
-      await db
-        .update(schema.target)
-        .set({ lastCheckedAt: new Date() })
-        .where(eq(schema.target.id, t.id));
+      const nowMs = Date.now();
+      // Read fresh interval + deadline inside a DB transaction so a concurrent PATCH
+      // cannot leave checkIntervalHours and nextCheckDueAt mismatched after we scrape.
+      db.transaction((tx) => {
+        const fresh = tx
+          .select({
+            nextCheckDueAt: schema.target.nextCheckDueAt,
+            checkIntervalHours: schema.target.checkIntervalHours,
+          })
+          .from(schema.target)
+          .where(eq(schema.target.id, t.id))
+          .limit(1)
+          .get();
+
+        if (!fresh) return;
+
+        const nextCheckDueAt = computeNextCheckDueAfterSuccess(
+          fresh.nextCheckDueAt,
+          fresh.checkIntervalHours,
+          nowMs,
+        );
+
+        tx.update(schema.target)
+          .set({ lastCheckedAt: new Date(nowMs), nextCheckDueAt })
+          .where(eq(schema.target.id, t.id))
+          .run();
+      });
     } catch (err) {
       errors += 1;
       console.error(`target ${t.id} (${t.kind}) failed:`, err);

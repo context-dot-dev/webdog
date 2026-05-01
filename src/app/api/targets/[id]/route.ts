@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import type { LinkScope } from "@/lib/db/schema";
 import * as schema from "@/lib/db/schema";
 import { badRequest, getApiUser, notFound, parseJson } from "@/lib/api";
+import { computeNextCheckDueAfterSuccess } from "@/lib/scraper";
 
 async function loadOwned(userId: string, targetId: string) {
   const rows = await db
@@ -78,11 +79,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const updates: {
     enabled?: boolean;
     checkIntervalHours?: number;
+    nextCheckDueAt?: Date | null;
     notificationDestinationId?: string | null;
     linkScope?: LinkScope;
   } = {};
   if (parsed.data.enabled !== undefined) updates.enabled = parsed.data.enabled;
-  if (parsed.data.checkIntervalHours !== undefined) updates.checkIntervalHours = parsed.data.checkIntervalHours;
+  if (parsed.data.checkIntervalHours !== undefined) {
+    updates.checkIntervalHours = parsed.data.checkIntervalHours;
+    const last = owned.target.lastCheckedAt;
+    // Use last check time as the phase anchor so the new deadline is always in
+    // the future (≤ one new interval away). Null means no prior check → due immediately.
+    updates.nextCheckDueAt =
+      last != null
+        ? computeNextCheckDueAfterSuccess(last, parsed.data.checkIntervalHours, Date.now())
+        : null;
+  }
   if (parsed.data.notificationDestinationId !== undefined) {
     updates.notificationDestinationId = parsed.data.notificationDestinationId;
   }
