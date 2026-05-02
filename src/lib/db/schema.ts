@@ -161,7 +161,11 @@ export const target = sqliteTable(
     /** Sole eligibility clock for scheduled runs; advanced by fixed interval after success. Null = due immediately. */
     nextCheckDueAt: integer("nextCheckDueAt", { mode: "timestamp_ms" }),
     lastCheckedAt: integer("lastCheckedAt", { mode: "timestamp_ms" }),
-    /** When set, outbound alerts from this target go only here; when null, use website-level routing. */
+    /**
+     * When false, alerts are stored only in-app — no Slack/email/webhook for this target.
+     * When true, `notificationDestinationId` selects a destination, or null means website-level routing.
+     */
+    externalNotify: integer("externalNotify", { mode: "boolean" }).notNull().default(true),
     notificationDestinationId: text("notificationDestinationId").references(
       () => notificationDestination.id,
       { onDelete: "set null" },

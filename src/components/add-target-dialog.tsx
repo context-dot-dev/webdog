@@ -1,18 +1,40 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { NotificationChannel } from "@/lib/db/schema";
+import type { NotificationChannel, NotificationDestination } from "@/lib/db/schema";
 import { TARGET_KIND_DESCRIPTION } from "./target-kind";
 import type { WebsiteDestOption } from "./website-notification-destinations";
+import { TARGET_FORM_DASHBOARD_ONLY } from "@/lib/website-notification-destinations";
 
 type MonitorCategory = "LINK" | "PAGE_CONTENT" | "PRODUCT_PRICE";
 
-function pageUrlPlaceholder(websiteDomain: string, kind: "PAGE_CONTENT" | "PRODUCT_PRICE"): string {
-  const host = websiteDomain.trim() || "example.com";
-  const base = `https://${host}/`;
-  return kind === "PRODUCT_PRICE" ? `${base}product/…` : `${base}pricing`;
+const FREQUENCY_PRESETS_HOURS = [1, 6, 12, 24, 48, 168] as const;
+
+function frequencyLabel(hours: number): string {
+  if (hours === 168) return "1 week";
+  if (hours === 1) return "Every hour";
+  return `Every ${hours} hours`;
+}
+
+function canonicalSiteHttpsOrigin(domainOrHost: string): string {
+  const raw = domainOrHost.trim() || "example.com";
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      return new URL(raw).origin;
+    } catch {
+      /* fall through to host fallback */
+    }
+  }
+  const hostOnly = raw.split("/")[0]?.replace(/^\/+/, "").trim();
+  return `https://${hostOnly || "example.com"}`;
+}
+
+function joinOriginAndRelativePath(siteOrigin: string, pathTail: string): string {
+  const stripped = pathTail.trim().replace(/^\/+/u, "");
+  if (!stripped) throw new Error("empty path");
+  return new URL(stripped, `${siteOrigin}/`).href;
 }
 
 function channelLabel(c: NotificationChannel): string {
@@ -21,6 +43,11 @@ function channelLabel(c: NotificationChannel): string {
   return "Webhook";
 }
 
+function rowsToDestOptions(rows: NotificationDestination[]): WebsiteDestOption[] {
+  return [...rows]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(({ id, channel, name }) => ({ id, channel, name }));
+}
 
 export function AddTargetDialog({
   websiteId,
@@ -33,59 +60,120 @@ export function AddTargetDialog({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [destinationOptions, setDestinationOptions] = useState<WebsiteDestOption[]>(destinations);
+  const [opening, setOpening] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [category, setCategory] = useState<MonitorCategory | null>(null);
-  const [pageUrl, setPageUrl] = useState("");
-  const [notificationDestinationId, setNotificationDestinationId] = useState("");
+  const [pagePath, setPagePath] = useState("");
+  const [notifyRouting, setNotifyRouting] = useState("");
+  const [checkIntervalHours, setCheckIntervalHours] = useState(24);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const resetForm = useCallback(() => {
-    setStep(1);
-    setCategory(null);
-    setPageUrl("");
-    setNotificationDestinationId(destinations.length === 1 ? destinations[0].id : "");
-    setError(null);
+  useEffect(() => {
+    setDestinationOptions(destinations);
   }, [destinations]);
 
-  function handleOpen() {
-    resetForm();
+  const resetForm = useCallback((opts: WebsiteDestOption[]) => {
+    setStep(1);
+    setCategory(null);
+    setPagePath("");
+    if (opts.length === 0) setNotifyRouting(TARGET_FORM_DASHBOARD_ONLY);
+    else if (opts.length === 1) setNotifyRouting(opts[0].id);
+    else setNotifyRouting("");
+    setCheckIntervalHours(24);
+    setError(null);
+  }, []);
+
+  const siteOrigin = useMemo(() => canonicalSiteHttpsOrigin(websiteDomain), [websiteDomain]);
+  const pageUrlInputPlaceholder = `${siteOrigin}/...`;
+  const pageUrlPreview =
+    category === "PAGE_CONTENT" || category === "PRODUCT_PRICE"
+      ? (() => {
+          try {
+            return joinOriginAndRelativePath(siteOrigin, pagePath);
+          } catch {
+            return `${siteOrigin}/`;
+          }
+        })()
+      : "";
+
+  async function handleOpen() {
+    setOpening(true);
+    let opts = destinationOptions;
+    try {
+      const res = await fetch("/api/user/notification-destinations");
+      if (res.ok) {
+        const data = (await res.json()) as { destinations: NotificationDestination[] };
+        opts = rowsToDestOptions(data.destinations ?? []);
+        setDestinationOptions(opts);
+      }
+    } finally {
+      setOpening(false);
+    }
+    resetForm(opts);
     setOpen(true);
   }
 
   function handleClose() {
     setOpen(false);
-    resetForm();
+    resetForm(destinationOptions);
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!category || destinations.length === 0) return;
+    if (!category) return;
+
+    let pageUrlFull = "";
+    if (category === "PAGE_CONTENT" || category === "PRODUCT_PRICE") {
+      try {
+        pageUrlFull = joinOriginAndRelativePath(siteOrigin, pagePath);
+        new URL(pageUrlFull);
+      } catch {
+        setError("Enter a valid page path for this website.");
+        return;
+      }
+    }
+
+    const dashboardOnly = notifyRouting === TARGET_FORM_DASHBOARD_ONLY;
+    if (!dashboardOnly && destinationOptions.length > 1 && notifyRouting === "") return;
+
     setError(null);
     setLoading(true);
 
-    const body =
+    const freq = { checkIntervalHours };
+
+    const outboundBody =
       category === "LINK"
-        ? {
-            category: "LINK" as const,
-            ...(notificationDestinationId ? { notificationDestinationId } : {}),
-          }
-        : category === "PAGE_CONTENT"
-          ? {
-              category: "PAGE_CONTENT" as const,
-              pageUrl,
-              ...(notificationDestinationId ? { notificationDestinationId } : {}),
-            }
+        ? dashboardOnly
+          ? { category: "LINK" as const, externalNotify: false as const, ...freq }
           : {
-              category: "PRODUCT_PRICE" as const,
-              pageUrl,
-              ...(notificationDestinationId ? { notificationDestinationId } : {}),
-            };
+              category: "LINK" as const,
+              ...(notifyRouting ? { notificationDestinationId: notifyRouting } : {}),
+              ...freq,
+            }
+        : category === "PAGE_CONTENT"
+          ? dashboardOnly
+            ? { category: "PAGE_CONTENT" as const, pageUrl: pageUrlFull, externalNotify: false as const, ...freq }
+            : {
+                category: "PAGE_CONTENT" as const,
+                pageUrl: pageUrlFull,
+                ...(notifyRouting ? { notificationDestinationId: notifyRouting } : {}),
+                ...freq,
+              }
+          : dashboardOnly
+            ? { category: "PRODUCT_PRICE" as const, pageUrl: pageUrlFull, externalNotify: false as const, ...freq }
+            : {
+                category: "PRODUCT_PRICE" as const,
+                pageUrl: pageUrlFull,
+                ...(notifyRouting ? { notificationDestinationId: notifyRouting } : {}),
+                ...freq,
+              };
 
     const res = await fetch(`/api/websites/${websiteId}/targets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(outboundBody),
     });
     setLoading(false);
     if (!res.ok) {
@@ -98,11 +186,19 @@ export function AddTargetDialog({
   }
 
   const canContinueStep1 = category !== null;
-  const noDestinations = destinations.length === 0;
+  const routingPickIncomplete =
+    destinationOptions.length > 1 &&
+    notifyRouting !== TARGET_FORM_DASHBOARD_ONLY &&
+    notifyRouting === "";
+
+  const frequencyOptions = (() => {
+    const set = new Set<number>([...FREQUENCY_PRESETS_HOURS, checkIntervalHours]);
+    return Array.from(set).sort((a, b) => a - b);
+  })();
 
   return (
     <>
-      <button type="button" onClick={handleOpen} className="btn-accent">
+      <button type="button" onClick={() => void handleOpen()} disabled={opening} className="btn-accent">
         <PlusIcon className="size-4" /> Add target
       </button>
       {open && (
@@ -177,47 +273,76 @@ export function AddTargetDialog({
                       <label htmlFor="page-url" className="block text-sm font-medium text-neutral-900">
                         {category === "PRODUCT_PRICE" ? "Product page URL" : "Page URL"}
                       </label>
+                      <p id="page-url-desc" className="sr-only">
+                        Paths share your site hostname. Fully composed URL:&nbsp;{pageUrlPreview}
+                      </p>
                       <input
                         id="page-url"
-                        name="pageUrl"
-                        type="url"
-                        className="input mt-1.5 font-mono"
-                        placeholder={pageUrlPlaceholder(websiteDomain, category)}
+                        name="pagePathTail"
+                        type="text"
+                        className="input mt-1.5 w-full font-mono"
+                        placeholder={pageUrlInputPlaceholder}
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
                         required
-                        value={pageUrl}
-                        onChange={(e) => setPageUrl(e.target.value)}
+                        value={pagePath}
+                        aria-describedby="page-url-desc"
+                        title={pageUrlPreview}
+                        onChange={(e) => setPagePath(e.target.value)}
                       />
                     </div>
                   )}
 
-                  <div>
-                    <label htmlFor="notify-dest" className="block text-sm font-medium text-neutral-900">
-                      Notification destination
-                    </label>
-                    <select
-                      id="notify-dest"
-                      className="input mt-1.5"
-                      required
-                      value={notificationDestinationId}
-                      onChange={(e) => setNotificationDestinationId(e.target.value)}
-                      disabled={noDestinations}
-                    >
-                      {destinations.length > 1 && <option value="">Select…</option>}
-                      {destinations.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name} ({channelLabel(d.channel)})
-                        </option>
-                      ))}
-                    </select>
-                    {noDestinations && (
-                      <p className="mt-2 text-sm text-neutral-600">
-                        Add a destination in{" "}
-                        <Link href="/dashboard/settings" className="font-medium text-brand-700 hover:underline">
-                          Settings
-                        </Link>{" "}
-                        first.
-                      </p>
-                    )}
+                  <div className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-5 max-[360px]:grid-cols-1">
+                    <div className="min-w-0">
+                      <label htmlFor="notify-dest" className="block text-sm font-medium text-neutral-900">
+                        Notification destination
+                      </label>
+                      <select
+                        id="notify-dest"
+                        className="input mt-1.5"
+                        value={notifyRouting}
+                        onChange={(e) => setNotifyRouting(e.target.value)}
+                      >
+                        {destinationOptions.length > 1 && <option value="">Choose…</option>}
+                        <option value={TARGET_FORM_DASHBOARD_ONLY}>None (dashboard only)</option>
+                        {destinationOptions.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name} ({channelLabel(d.channel)})
+                          </option>
+                        ))}
+                      </select>
+                      {destinationOptions.length === 0 ? (
+                        <p className="mt-2 text-sm text-neutral-600">
+                          Add integrations in{" "}
+                          <Link href="/dashboard/settings" className="font-medium text-brand-700 hover:underline">
+                            Settings
+                          </Link>{" "}
+                          to notify Slack, email, or a webhook. Without them, alerts stay in the dashboard.
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="min-w-0">
+                      <label htmlFor="check-interval" className="block text-sm font-medium text-neutral-900">
+                        Check frequency
+                      </label>
+                      <select
+                        id="check-interval"
+                        name="checkIntervalHours"
+                        className="input mt-1.5"
+                        value={checkIntervalHours}
+                        onChange={(e) => setCheckIntervalHours(Number(e.target.value))}
+                        aria-label="How often to check this monitor"
+                      >
+                        {frequencyOptions.map((h) => (
+                          <option key={h} value={h}>
+                            {frequencyLabel(h)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}
@@ -260,7 +385,11 @@ export function AddTargetDialog({
                       Continue
                     </button>
                   ) : (
-                    <button type="submit" disabled={loading || noDestinations || !notificationDestinationId} className="btn-accent">
+                    <button
+                      type="submit"
+                      disabled={loading || routingPickIncomplete}
+                      className="btn-accent"
+                    >
                       {loading ? "Adding…" : "Add target"}
                     </button>
                   )}

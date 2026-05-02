@@ -35,13 +35,15 @@ const patchSchema = z
     checkIntervalHours: z.number().int().min(1).max(8760).optional(),
     notificationDestinationId: z.union([z.string().min(1), z.null()]).optional(),
     linkScope: z.enum(["NEW", "REMOVED", "BOTH"]).optional(),
+    externalNotify: z.boolean().optional(),
   })
   .refine(
     (d) =>
       d.enabled !== undefined ||
       d.checkIntervalHours !== undefined ||
       d.notificationDestinationId !== undefined ||
-      d.linkScope !== undefined,
+      d.linkScope !== undefined ||
+      d.externalNotify !== undefined,
     {
       message: "At least one field to update is required",
     },
@@ -58,13 +60,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = await parseJson(req, patchSchema);
   if (parsed.response) return parsed.response;
 
-  if (parsed.data.notificationDestinationId !== undefined && parsed.data.notificationDestinationId !== null) {
+  const extPart = parsed.data.externalNotify;
+  const nidPart = parsed.data.notificationDestinationId;
+
+  if (extPart === false && typeof nidPart === "string") {
+    return badRequest("Cannot attach a destination to a dashboard-only target.");
+  }
+
+  if (typeof nidPart === "string") {
     const [dest] = await db
       .select({ id: schema.notificationDestination.id })
       .from(schema.notificationDestination)
       .where(
         and(
-          eq(schema.notificationDestination.id, parsed.data.notificationDestinationId),
+          eq(schema.notificationDestination.id, nidPart),
           eq(schema.notificationDestination.userId, user.id),
         ),
       )
@@ -82,20 +91,32 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     nextCheckDueAt?: Date | null;
     notificationDestinationId?: string | null;
     linkScope?: LinkScope;
+    externalNotify?: boolean;
   } = {};
   if (parsed.data.enabled !== undefined) updates.enabled = parsed.data.enabled;
   if (parsed.data.checkIntervalHours !== undefined) {
     updates.checkIntervalHours = parsed.data.checkIntervalHours;
     const last = owned.target.lastCheckedAt;
-    // Use last check time as the phase anchor so the new deadline is always in
-    // the future (≤ one new interval away). Null means no prior check → due immediately.
     updates.nextCheckDueAt =
       last != null
         ? computeNextCheckDueAfterSuccess(last, parsed.data.checkIntervalHours, Date.now())
         : null;
   }
-  if (parsed.data.notificationDestinationId !== undefined) {
-    updates.notificationDestinationId = parsed.data.notificationDestinationId;
+  if (extPart !== undefined || nidPart !== undefined) {
+    if (extPart === false) {
+      updates.externalNotify = false;
+      updates.notificationDestinationId = null;
+    } else if (nidPart !== undefined) {
+      if (nidPart !== null) {
+        updates.notificationDestinationId = nidPart;
+        updates.externalNotify = true;
+      } else {
+        updates.notificationDestinationId = null;
+        updates.externalNotify = true;
+      }
+    } else if (extPart === true) {
+      updates.externalNotify = true;
+    }
   }
   if (parsed.data.linkScope !== undefined) updates.linkScope = parsed.data.linkScope;
 

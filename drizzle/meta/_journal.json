@@ -64,6 +64,13 @@
       "when": 1777310000000,
       "tag": "0008_target_next_check_due",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1777320000000,
+      "tag": "0009_target_external_notify",
+      "breakpoints": true
     }
   ]
 }

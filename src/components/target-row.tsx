@@ -7,6 +7,10 @@ import type { TargetChangeDetail, TargetFetchEntry } from "@/lib/target-fetch-hi
 import { KindBadge } from "./target-kind";
 import { RelativeTime } from "./relative-time";
 import type { WebsiteDestOption } from "./website-notification-destinations";
+import {
+  TARGET_FORM_DASHBOARD_ONLY,
+  TARGET_FORM_WEBSITE_DEFAULT,
+} from "@/lib/website-notification-destinations";
 import { DiffPreview, LinksBlock, PriceChangeDetails } from "./alert-item";
 import { ProductPriceHistoryPanel } from "./product-price-history-panel";
 import { RunNowButton } from "./run-now-button";
@@ -53,6 +57,11 @@ const LINK_SCOPE_OPTIONS: { value: LinkScope; label: string }[] = [
 function coerceLinkScope(v: string | null | undefined): LinkScope {
   if (v === "NEW" || v === "REMOVED" || v === "BOTH") return v;
   return "BOTH";
+}
+
+function deriveOutboundRouting(target: Target): string {
+  if (!(target.externalNotify ?? true)) return TARGET_FORM_DASHBOARD_ONLY;
+  return target.notificationDestinationId ?? TARGET_FORM_WEBSITE_DEFAULT;
 }
 
 function FetchChangeDetailView({ detail }: { detail: TargetChangeDetail }) {
@@ -139,9 +148,7 @@ export function TargetRow({
   const detailsId = useId();
   const [enabled, setEnabled] = useState(target.enabled);
   const [checkIntervalHours, setCheckIntervalHours] = useState(target.checkIntervalHours ?? 1);
-  const [notificationDestinationId, setNotificationDestinationId] = useState(
-    target.notificationDestinationId ?? "",
-  );
+  const [outboundRouting, setOutboundRouting] = useState(() => deriveOutboundRouting(target));
   const [linkScope, setLinkScope] = useState<LinkScope>(() => coerceLinkScope(target.linkScope));
   const [busy, setBusy] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -157,12 +164,13 @@ export function TargetRow({
   useEffect(() => {
     setEnabled(target.enabled);
     setCheckIntervalHours(target.checkIntervalHours ?? 1);
-    setNotificationDestinationId(target.notificationDestinationId ?? "");
+    setOutboundRouting(deriveOutboundRouting(target));
     setLinkScope(coerceLinkScope(target.linkScope));
   }, [
     target.enabled,
     target.checkIntervalHours,
     target.notificationDestinationId,
+    target.externalNotify,
     target.linkScope,
   ]);
 
@@ -217,18 +225,22 @@ export function TargetRow({
     }
   }
 
-  async function setDestination(nextId: string) {
+  async function setOutboundRoutingPreference(nextSel: string) {
     setBusy(true);
+    const body =
+      nextSel === TARGET_FORM_DASHBOARD_ONLY
+        ? { externalNotify: false, notificationDestinationId: null }
+        : nextSel === TARGET_FORM_WEBSITE_DEFAULT
+          ? { externalNotify: true, notificationDestinationId: null }
+          : { externalNotify: true, notificationDestinationId: nextSel };
     const res = await fetch(`/api/targets/${target.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        notificationDestinationId: nextId === "" ? null : nextId,
-      }),
+      body: JSON.stringify(body),
     });
     setBusy(false);
     if (res.ok) {
-      setNotificationDestinationId(nextId);
+      setOutboundRouting(nextSel);
       router.refresh();
     }
   }
@@ -340,15 +352,16 @@ export function TargetRow({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-0.5 text-xs text-neutral-600">
-              <span>Alert destination</span>
+              <span>Alert routing</span>
               <select
                 className="w-full max-w-md rounded-lg border border-neutral-950/10 bg-white px-2 py-1.5 text-xs text-neutral-800 shadow-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
-                value={notificationDestinationId}
-                disabled={busy || destinations.length === 0}
-                onChange={(e) => void setDestination(e.target.value)}
-                aria-label="Notification destination for this target"
+                value={outboundRouting}
+                disabled={busy}
+                onChange={(e) => void setOutboundRoutingPreference(e.target.value)}
+                aria-label="Where alerts go for this target"
               >
-                <option value="">Website default</option>
+                <option value={TARGET_FORM_DASHBOARD_ONLY}>None (dashboard only)</option>
+                <option value={TARGET_FORM_WEBSITE_DEFAULT}>Website default routing</option>
                 {destinations.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name} ({channelLabel(d.channel)})

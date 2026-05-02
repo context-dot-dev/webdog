@@ -10,16 +10,22 @@ const createSchema = z.discriminatedUnion("category", [
   z.object({
     category: z.literal("LINK"),
     notificationDestinationId: z.string().optional(),
+    externalNotify: z.boolean().optional(),
+    checkIntervalHours: z.number().int().min(1).max(8760).optional(),
   }),
   z.object({
     category: z.literal("PAGE_CONTENT"),
     pageUrl: z.string().url(),
     notificationDestinationId: z.string().optional(),
+    externalNotify: z.boolean().optional(),
+    checkIntervalHours: z.number().int().min(1).max(8760).optional(),
   }),
   z.object({
     category: z.literal("PRODUCT_PRICE"),
     pageUrl: z.string().url(),
     notificationDestinationId: z.string().optional(),
+    externalNotify: z.boolean().optional(),
+    checkIntervalHours: z.number().int().min(1).max(8760).optional(),
   }),
 ]);
 
@@ -65,15 +71,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = await parseJson(req, createSchema);
   if (parsed.response) return parsed.response;
 
-  const destId = await resolveNotificationDestinationId(
-    user.id,
-    parsed.data.notificationDestinationId,
-  );
-  if (!destId) {
-    return badRequest(
-      "Select a notification destination, or add exactly one in Settings to use it by default.",
-    );
+  const wantOutbound = parsed.data.externalNotify !== false;
+  const providedDest = parsed.data.notificationDestinationId?.trim();
+  if (!wantOutbound && providedDest)
+    return badRequest("Dashboard-only targets cannot include a notification destination");
+
+  let destId: string | null = null;
+  if (wantOutbound) {
+    destId = await resolveNotificationDestinationId(user.id, parsed.data.notificationDestinationId);
+    if (!destId) {
+      return badRequest(
+        "Select a notification destination, or add exactly one in Settings to use it by default.",
+      );
+    }
   }
+
+  const checkIntervalHours = parsed.data.checkIntervalHours ?? 24;
 
   const created: (typeof schema.target.$inferSelect)[] = [];
 
@@ -101,8 +114,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       linkScope: "BOTH",
       pageUrl: null,
       notificationDestinationId: destId,
+      externalNotify: wantOutbound,
       enabled: true,
-      checkIntervalHours: 1,
+      checkIntervalHours,
       createdAt: new Date(),
     });
     const [row] = await db.select().from(schema.target).where(eq(schema.target.id, targetId)).limit(1);
@@ -114,7 +128,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const kind =
     parsed.data.category === "PAGE_CONTENT" ? ("PAGE_CONTENT" as const) : ("PRODUCT_PRICE" as const);
   const pageUrl = parsed.data.pageUrl;
-  const checkIntervalHours = kind === "PRODUCT_PRICE" ? 24 : 1;
 
   const existing = await db
     .select({ id: schema.target.id })
@@ -132,6 +145,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     kind,
     pageUrl,
     notificationDestinationId: destId,
+    externalNotify: wantOutbound,
     enabled: true,
     checkIntervalHours,
     createdAt: new Date(),

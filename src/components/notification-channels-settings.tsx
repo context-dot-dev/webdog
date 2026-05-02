@@ -47,6 +47,33 @@ function trunc(s: string, n: number): string {
   return t.length <= n ? t : `${t.slice(0, n)}…`;
 }
 
+/** Redact path/query for inbound webhook URLs (shown until user chooses Show). */
+function redactSecretUrl(url: string): string {
+  const t = url.trim();
+  if (!t) return "—";
+  try {
+    const u = new URL(t);
+    if (u.hostname === "hooks.slack.com" && u.pathname.startsWith("/services/")) {
+      return `${u.origin}/services/••••••••`;
+    }
+    return `${u.origin}/••••••••`;
+  } catch {
+    return "••••••••";
+  }
+}
+
+function destinationSecretUrl(d: NotificationDestination): string | null {
+  if (d.channel === "SLACK") {
+    const u = d.slackWebhookUrl?.trim() ?? "";
+    return u || null;
+  }
+  if (d.channel === "WEBHOOK") {
+    const u = d.alertWebhookUrl?.trim() ?? "";
+    return u || null;
+  }
+  return null;
+}
+
 function destinationSummary(d: NotificationDestination): string {
   if (d.channel === "SLACK") {
     const u = d.slackWebhookUrl?.trim() ?? "";
@@ -59,6 +86,13 @@ function destinationSummary(d: NotificationDestination): string {
   }
   const u = d.alertWebhookUrl?.trim() ?? "";
   return u ? trunc(u, 48) : "—";
+}
+
+/** Line in destination list: webhook URL with path redacted (no reveal control). */
+function RedactedWebhookSummary({ url }: { url: string }) {
+  return (
+    <div className="truncate font-mono text-xs text-neutral-600">{redactSecretUrl(url)}</div>
+  );
 }
 
 function canTestDestination(d: NotificationDestination, accountResendKey: string): boolean {
@@ -153,51 +187,58 @@ function NotificationChannelRow({
         <div className="space-y-3 px-5 pb-5">
           {visibleList.length > 0 ? (
             <div className="max-w-xl space-y-2">
-              {visibleList.map((d) => (
-                <div
-                  key={d.id}
-                  className="rounded-lg bg-neutral-50/80 px-3 py-2.5 ring-1 ring-neutral-950/5"
-                >
-                  <div className="flex min-w-0 items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-neutral-900">{d.name}</div>
-                      <div className="truncate font-mono text-xs text-neutral-600">{destinationSummary(d)}</div>
-                      {testFlashId === d.id ? (
-                        <p className="mt-0.5 text-xs text-brand-700">Test sent</p>
-                      ) : null}
-                    </div>
-                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onTest(d.id)}
-                        disabled={testBusyId === d.id || !canTestDestination(d, resendApiKey)}
-                        title={
-                          !canTestDestination(d, resendApiKey)
-                            ? "Complete this destination (and save the Resend key for email)"
-                            : undefined
-                        }
-                        className="btn-secondary box-border h-8 !px-2 !py-0 text-xs"
-                      >
-                        {testBusyId === d.id ? "…" : "Test"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onStartEdit(d)}
-                        className="btn-secondary box-border h-8 !px-2 !py-0 text-xs"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void onDelete(d.id)}
-                        className="btn-ghost box-border h-8 !px-2 !py-0 text-xs text-red-700 ring-red-200 hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
+              {visibleList.map((d) => {
+                const secretUrl = destinationSecretUrl(d);
+                return (
+                  <div
+                    key={d.id}
+                    className="rounded-lg bg-neutral-50/80 px-3 py-2.5 ring-1 ring-neutral-950/5"
+                  >
+                    <div className="flex min-w-0 items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-neutral-900">{d.name}</div>
+                        {secretUrl ? (
+                          <RedactedWebhookSummary url={secretUrl} />
+                        ) : (
+                          <div className="truncate font-mono text-xs text-neutral-600">{destinationSummary(d)}</div>
+                        )}
+                        {testFlashId === d.id ? (
+                          <p className="mt-0.5 text-xs text-brand-700">Test sent</p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onTest(d.id)}
+                          disabled={testBusyId === d.id || !canTestDestination(d, resendApiKey)}
+                          title={
+                            !canTestDestination(d, resendApiKey)
+                              ? "Complete this destination (and save the Resend key for email)"
+                              : undefined
+                          }
+                          className="btn-secondary box-border h-8 !px-2 !py-0 text-xs"
+                        >
+                          {testBusyId === d.id ? "…" : "Test"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onStartEdit(d)}
+                          className="btn-secondary box-border h-8 !px-2 !py-0 text-xs"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void onDelete(d.id)}
+                          className="btn-ghost box-border h-8 !px-2 !py-0 text-xs text-red-700 ring-red-200 hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : null}
 
@@ -226,6 +267,8 @@ export function NotificationChannelsSettings({
   const [formFrom, setFormFrom] = useState("");
   const [formTo, setFormTo] = useState("");
   const [formHookUrl, setFormHookUrl] = useState("");
+  const [revealFormSlackUrl, setRevealFormSlackUrl] = useState(false);
+  const [revealFormHookUrl, setRevealFormHookUrl] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSaving, setFormSaving] = useState(false);
 
@@ -248,6 +291,8 @@ export function NotificationChannelsSettings({
     setFormFrom("");
     setFormTo("");
     setFormHookUrl("");
+    setRevealFormSlackUrl(false);
+    setRevealFormHookUrl(false);
   };
 
   const startEdit = (d: NotificationDestination) => {
@@ -259,12 +304,16 @@ export function NotificationChannelsSettings({
     setFormFrom(d.resendFromEmail ?? "");
     setFormTo(d.resendToEmails ?? "");
     setFormHookUrl(d.alertWebhookUrl ?? "");
+    setRevealFormSlackUrl(false);
+    setRevealFormHookUrl(false);
   };
 
   const cancelForm = () => {
     setAddingChannel(null);
     setEditingId(null);
     setFormError(null);
+    setRevealFormSlackUrl(false);
+    setRevealFormHookUrl(false);
   };
 
   async function submitForm(channel: Channel) {
@@ -411,11 +460,23 @@ export function NotificationChannelsSettings({
         </div>
         {channel === "SLACK" ? (
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-neutral-700">Slack webhook URL</label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="block text-xs font-medium text-neutral-700">Slack webhook URL</label>
+              <button
+                type="button"
+                onClick={() => setRevealFormSlackUrl((v) => !v)}
+                aria-pressed={revealFormSlackUrl}
+                aria-label={revealFormSlackUrl ? "Hide Slack webhook URL" : "Show Slack webhook URL"}
+                className="btn-ghost box-border h-7 shrink-0 !px-2 !py-0 text-xs text-neutral-600"
+              >
+                {revealFormSlackUrl ? "Hide" : "Show"}
+              </button>
+            </div>
             <input
               value={formSlackUrl}
               onChange={(e) => setFormSlackUrl(e.target.value)}
-              type="url"
+              type={revealFormSlackUrl ? "text" : "password"}
+              autoComplete="off"
               className="input box-border h-9 w-full font-mono text-xs"
               placeholder="https://hooks.slack.com/services/…"
             />
@@ -468,11 +529,23 @@ export function NotificationChannelsSettings({
         ) : null}
         {channel === "WEBHOOK" ? (
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-neutral-700">Webhook URL</label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="block text-xs font-medium text-neutral-700">Webhook URL</label>
+              <button
+                type="button"
+                onClick={() => setRevealFormHookUrl((v) => !v)}
+                aria-pressed={revealFormHookUrl}
+                aria-label={revealFormHookUrl ? "Hide webhook URL" : "Show webhook URL"}
+                className="btn-ghost box-border h-7 shrink-0 !px-2 !py-0 text-xs text-neutral-600"
+              >
+                {revealFormHookUrl ? "Hide" : "Show"}
+              </button>
+            </div>
             <input
               value={formHookUrl}
               onChange={(e) => setFormHookUrl(e.target.value)}
-              type="url"
+              type={revealFormHookUrl ? "text" : "password"}
+              autoComplete="off"
               className="input box-border h-9 w-full font-mono text-xs"
               placeholder="https://…"
             />

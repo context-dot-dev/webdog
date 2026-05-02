@@ -1,7 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
+
+/** Strips scheme and path when pasting a URL so the value is hostname-only (`https://` is shown beside the input). */
+function normalizePastedDomainField(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) {
+    try {
+      const u = new URL(t);
+      return u.host || t;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const noProto = t.replace(/^\/\//, "").replace(/^https?:\/\//i, "");
+  return noProto.split("/")[0].split("?")[0].split("#")[0].trim();
+}
 
 export function AddWebsiteDialog() {
   const router = useRouter();
@@ -40,7 +59,7 @@ export function AddWebsiteDialog() {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="btn-accent">
+      <button type="button" onClick={() => setOpen(true)} className="btn-accent h-8 !py-0">
         <PlusIcon className="size-4" /> Add website
       </button>
       {open && (
@@ -85,6 +104,21 @@ export function AddWebsiteDialog() {
                     required
                     value={domain}
                     onChange={(e) => setDomain(e.target.value)}
+                    onPaste={(e) => {
+                      const raw = e.clipboardData.getData("text/plain");
+                      const norm = normalizePastedDomainField(raw);
+                      if (norm === raw.trim()) return;
+                      e.preventDefault();
+                      const el = e.currentTarget;
+                      const start = el.selectionStart ?? 0;
+                      const end = el.selectionEnd ?? start;
+                      const next = `${domain.slice(0, start)}${norm}${domain.slice(end)}`;
+                      flushSync(() => setDomain(next));
+                      requestAnimationFrame(() => {
+                        const pos = start + norm.length;
+                        el.setSelectionRange(pos, pos);
+                      });
+                    }}
                   />
                 </div>
                 <p className="mt-2 text-xs text-neutral-500">

@@ -25,6 +25,47 @@ type ViewMode = "grid" | "list";
 
 const VIEW_PREF_KEY = "website-watchdog:dashboard-view";
 
+function WebsiteLogoAvatar({
+  logoUrl,
+  fallbackLetter,
+  className = "",
+  compact = false,
+}: {
+  logoUrl: string | null;
+  fallbackLetter: string;
+  className?: string;
+  /** List rows: original 36×36 footprint with the same card styling as grid. */
+  compact?: boolean;
+}) {
+  const frame = compact
+    ? "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-xs ring-1 ring-neutral-950/10"
+    : "flex size-14 items-center justify-center overflow-hidden rounded-xl bg-white shadow-xs ring-1 ring-neutral-950/10";
+
+  return (
+    <div className={`${frame} ${className}`}>
+      {logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logoUrl}
+          alt=""
+          className={
+            compact
+              ? "size-7 rounded-[calc(theme(borderRadius.xl)-(theme(spacing.9)-theme(spacing.7))/2)] object-contain"
+              : "size-11 rounded-[calc(theme(borderRadius.xl)-(theme(spacing.14)-theme(spacing.11))/2)] object-contain"
+          }
+          loading="lazy"
+        />
+      ) : (
+        <span
+          className={`font-mono font-semibold text-brand-700 ${compact ? "text-sm" : "text-lg"}`}
+        >
+          {fallbackLetter}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function GridIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden>
@@ -82,7 +123,7 @@ export function WebsiteListView({ websites }: { websites: Website[] }) {
               onClick={() => switchView("grid")}
               aria-pressed={view === "grid"}
               aria-label="Grid view"
-              className={`flex items-center justify-center px-2.5 py-1.5 text-sm transition ${
+              className={`flex h-8 min-w-8 items-center justify-center px-2.5 text-sm transition ${
                 view === "grid"
                   ? "bg-neutral-100 text-neutral-900"
                   : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
@@ -95,7 +136,7 @@ export function WebsiteListView({ websites }: { websites: Website[] }) {
               onClick={() => switchView("list")}
               aria-pressed={view === "list"}
               aria-label="List view"
-              className={`flex items-center justify-center px-2.5 py-1.5 text-sm transition border-l border-neutral-950/10 ${
+              className={`flex h-8 min-w-8 items-center justify-center px-2.5 text-sm transition border-l border-neutral-950/10 ${
                 view === "list"
                   ? "bg-neutral-100 text-neutral-900"
                   : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
@@ -159,21 +200,11 @@ function GridView({ websites }: { websites: Website[] }) {
             </div>
 
             <div className="relative z-10 flex flex-1 flex-col px-5 pb-5">
-              <div className="-mt-7 flex size-14 items-center justify-center overflow-hidden rounded-xl bg-white shadow-xs ring-1 ring-neutral-950/10">
-                {w.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={w.logoUrl}
-                    alt=""
-                    className="size-11 rounded-[calc(theme(borderRadius.xl)-(theme(spacing.14)-theme(spacing.11))/2)] object-contain"
-                    loading="lazy"
-                  />
-                ) : (
-                  <span className="font-mono text-lg font-semibold text-brand-700">
-                    {w.domain[0]?.toUpperCase() ?? "W"}
-                  </span>
-                )}
-              </div>
+              <WebsiteLogoAvatar
+                logoUrl={w.logoUrl}
+                fallbackLetter={w.domain[0]?.toUpperCase() ?? "W"}
+                className="-mt-7"
+              />
 
               <div className="mt-3 min-w-0">
                 <h2 className="truncate text-sm font-semibold text-neutral-900">
@@ -222,22 +253,11 @@ function ListView({ websites }: { websites: Website[] }) {
             href={`/dashboard/websites/${w.id}`}
             className="group flex items-center gap-4 px-5 py-3.5 transition hover:bg-neutral-50"
           >
-            {/* Logo */}
-            <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-neutral-950/8">
-              {w.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={w.logoUrl}
-                  alt=""
-                  className="size-7 object-contain"
-                  loading="lazy"
-                />
-              ) : (
-                <span className="font-mono text-sm font-semibold text-brand-700">
-                  {w.domain[0]?.toUpperCase() ?? "W"}
-                </span>
-              )}
-            </div>
+            <WebsiteLogoAvatar
+              logoUrl={w.logoUrl}
+              fallbackLetter={w.domain[0]?.toUpperCase() ?? "W"}
+              compact
+            />
 
             {/* Name + domain */}
             <div className="min-w-0 flex-1">
