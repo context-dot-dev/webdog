@@ -6,6 +6,8 @@
   "deploy": {
     "startCommand": "sh -c \"npm run db:migrate || exit 1; npm run worker & exec npm run start\"",
     "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 300
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "on_failure",
+    "requiredMountPath": "/data"
   }
 }

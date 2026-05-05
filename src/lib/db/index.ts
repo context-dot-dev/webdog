@@ -21,7 +21,6 @@ function getConnection(): Connection {
   const dbUrl = resolveDatabaseUrl();
   ensureSQLiteParentDir(dbUrl);
   const dbPath = sqliteFilePath(dbUrl);
-  console.log(`[db] opening database at: ${dbPath}`);
 
   const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
