@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
+import { rawSqlite } from "@/lib/db";
 
-/** Lightweight health check for platform deploy hooks (e.g. Railway). */
+/** Readiness-style check: verifies SQLite is reachable (Railway healthchecks). */
 export async function GET() {
-  return NextResponse.json({ ok: true });
+  try {
+    rawSqlite.prepare("SELECT 1").get();
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
 }

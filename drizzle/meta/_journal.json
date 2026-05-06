@@ -71,6 +71,13 @@
       "when": 1777320000000,
       "tag": "0009_target_external_notify",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1777330000000,
+      "tag": "0010_target_check_interval_real",
+      "breakpoints": true
     }
   ]
 }

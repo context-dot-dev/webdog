@@ -7,16 +7,9 @@ import type { NotificationChannel, NotificationDestination } from "@/lib/db/sche
 import { TARGET_KIND_DESCRIPTION } from "./target-kind";
 import type { WebsiteDestOption } from "./website-notification-destinations";
 import { TARGET_FORM_DASHBOARD_ONLY } from "@/lib/website-notification-destinations";
+import { CHECK_FREQUENCY_PRESET_HOURS, checkFrequencyLabel } from "@/lib/check-frequency-presets";
 
 type MonitorCategory = "LINK" | "PAGE_CONTENT" | "PRODUCT_PRICE";
-
-const FREQUENCY_PRESETS_HOURS = [1, 6, 12, 24, 48, 168] as const;
-
-function frequencyLabel(hours: number): string {
-  if (hours === 168) return "1 week";
-  if (hours === 1) return "Every hour";
-  return `Every ${hours} hours`;
-}
 
 function canonicalSiteHttpsOrigin(domainOrHost: string): string {
   const raw = domainOrHost.trim() || "example.com";
@@ -192,7 +185,7 @@ export function AddTargetDialog({
     notifyRouting === "";
 
   const frequencyOptions = (() => {
-    const set = new Set<number>([...FREQUENCY_PRESETS_HOURS, checkIntervalHours]);
+    const set = new Set<number>([...CHECK_FREQUENCY_PRESET_HOURS, checkIntervalHours]);
     return Array.from(set).sort((a, b) => a - b);
   })();
 
@@ -338,7 +331,7 @@ export function AddTargetDialog({
                       >
                         {frequencyOptions.map((h) => (
                           <option key={h} value={h}>
-                            {frequencyLabel(h)}
+                            {checkFrequencyLabel(h)}
                           </option>
                         ))}
                       </select>

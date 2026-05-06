@@ -16,8 +16,7 @@ import { ProductPriceHistoryPanel } from "./product-price-history-panel";
 import { RunNowButton } from "./run-now-button";
 import type { ProductPricePoint } from "@/lib/product-price-history";
 import { formatProductPrice } from "@/lib/product-price-history";
-
-const FREQUENCY_PRESETS_HOURS = [1, 6, 12, 24, 48, 168] as const;
+import { CHECK_FREQUENCY_PRESET_HOURS, checkFrequencyLabel } from "@/lib/check-frequency-presets";
 
 /** Full URL for the link; label is path+query+hash when same host as the website, else the full URL. */
 function targetUrlPresentation(websiteUrl: string, pageUrl: string | null): { href: string; label: string } {
@@ -40,12 +39,6 @@ function channelLabel(c: NotificationChannel): string {
   if (c === "SLACK") return "Slack";
   if (c === "EMAIL") return "Email";
   return "Webhook";
-}
-
-function frequencyLabel(hours: number): string {
-  if (hours === 168) return "1 week";
-  if (hours === 1) return "Every hour";
-  return `Every ${hours} hours`;
 }
 
 const LINK_SCOPE_OPTIONS: { value: LinkScope; label: string }[] = [
@@ -157,7 +150,7 @@ export function TargetRow({
   const { href: targetHref, label: targetLabel } = targetUrlPresentation(websiteUrl, target.pageUrl);
 
   const hourOptions = (() => {
-    const set = new Set<number>([...FREQUENCY_PRESETS_HOURS, checkIntervalHours]);
+    const set = new Set<number>([...CHECK_FREQUENCY_PRESET_HOURS, checkIntervalHours]);
     return Array.from(set).sort((a, b) => a - b);
   })();
 
@@ -377,11 +370,11 @@ export function TargetRow({
                 value={checkIntervalHours}
                 disabled={busy}
                 onChange={(e) => void setFrequency(Number(e.target.value))}
-                aria-label="Check frequency in hours"
+                aria-label="How often to check this monitor"
               >
                 {hourOptions.map((h) => (
                   <option key={h} value={h}>
-                    {frequencyLabel(h)}
+                    {checkFrequencyLabel(h)}
                   </option>
                 ))}
               </select>

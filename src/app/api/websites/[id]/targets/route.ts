@@ -11,21 +11,21 @@ const createSchema = z.discriminatedUnion("category", [
     category: z.literal("LINK"),
     notificationDestinationId: z.string().optional(),
     externalNotify: z.boolean().optional(),
-    checkIntervalHours: z.number().int().min(1).max(8760).optional(),
+    checkIntervalHours: z.number().min(0.25).max(8760).optional(),
   }),
   z.object({
     category: z.literal("PAGE_CONTENT"),
     pageUrl: z.string().url(),
     notificationDestinationId: z.string().optional(),
     externalNotify: z.boolean().optional(),
-    checkIntervalHours: z.number().int().min(1).max(8760).optional(),
+    checkIntervalHours: z.number().min(0.25).max(8760).optional(),
   }),
   z.object({
     category: z.literal("PRODUCT_PRICE"),
     pageUrl: z.string().url(),
     notificationDestinationId: z.string().optional(),
     externalNotify: z.boolean().optional(),
-    checkIntervalHours: z.number().int().min(1).max(8760).optional(),
+    checkIntervalHours: z.number().min(0.25).max(8760).optional(),
   }),
 ]);
 

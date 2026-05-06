@@ -98,7 +98,7 @@ You still **configure** the deployment so one of these resolves to a real HTTPS 
 - **`BETTER_AUTH_URL`** — optional; if unset, the app uses **`https://${RAILWAY_PUBLIC_DOMAIN}`** when Railway provides it (see **Public URL / Better Auth** above). Set explicitly for an override or when the system domain variable is unreliable.
 - **`NEXT_PUBLIC_APP_URL`** — optional Railway fallback (`https://…`) after **`RAILWAY_PUBLIC_DOMAIN`**; useful when the system variable is empty or must match Next’s public bundle.
 - **`BETTER_AUTH_ALLOWED_HOSTS`** — optional; comma-separated **host patterns** (wildcards allowed, e.g. `*.up.railway.app`) so sign-in works from **multiple or changing** public URLs without redeploying each time.
-- **`BETTER_AUTH_SECRET`** — optional on Railway; if unset, a secret is written once to `/data/.better-auth-secret` on the volume (persists across deploys). You can still set this variable explicitly or use `${{secret(...)}}` in a [published template](https://docs.railway.com/guides/create).
+- **`BETTER_AUTH_SECRET`** — optional on Railway; if unset, a secret is written once to `/data/.better-auth-secret` on the volume (persists across deploys). You can still set this variable explicitly or use `${{secret(...)}}` in a [published template](https://docs.railway.com/templates/create).
 - **`SCRAPE_CRON`**, **`BETTER_AUTH_TRUSTED_ORIGINS`** — optional.
 
 Steps:
@@ -128,7 +128,9 @@ If `better-sqlite3` fails to compile on the builder, add a Dockerfile with build
 
 ### Publishing your own Railway template
 
-In the [template composer](https://docs.railway.com/guides/create): add this repo as the service source, attach a volume at `/data`, enable HTTP public networking, and add a single **required** variable `CONTEXT_DEV_API_KEY` for deployers. Optional: add `BETTER_AUTH_SECRET=${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=` (see [template variable functions](https://docs.railway.com/guides/create#template-variable-functions)) instead of relying on the auto-generated volume secret. Copy the **template URL** Railway gives you into your README or site for true one-click deploys.
+Follow **[`railway/template-publish.md`](railway/template-publish.md)** for icons, naming, volume **`/data`**, health path **`/api/health`**, variable descriptions, and marketplace overview text aligned with Railway’s [template best practices](https://docs.railway.com/templates/best-practices).
+
+In the [template composer](https://docs.railway.com/templates/create): add this repo as the service source, attach a volume at **`/data`**, enable HTTP public networking, and add a **required** variable **`CONTEXT_DEV_API_KEY`** for deployers. Optional: add **`BETTER_AUTH_SECRET=${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=`** (see [template variable functions](https://docs.railway.com/templates/create#template-variable-functions)) instead of relying on the auto-generated volume secret. Copy the **template URL** Railway gives you into your README or site for one-click deploys.
 
 ## Contributing
 

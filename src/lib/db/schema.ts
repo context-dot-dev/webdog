@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
 /* ------------------------------------------------------------------ */
 /* BetterAuth core tables — field names follow the BetterAuth defaults. */
@@ -156,8 +156,8 @@ export const target = sqliteTable(
     /** For PAGE_CONTENT / PRODUCT_PRICE: the page URL. Null for sitemap-based targets. */
     pageUrl: text("pageUrl"),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-    /** Minimum spacing between successful checks (hours); worker wakes per SCRAPE_CRON. */
-    checkIntervalHours: integer("checkIntervalHours").notNull().default(1),
+    /** Minimum spacing between successful checks (hours, fractional OK — e.g. 0.25 = 15m); worker wakes per SCRAPE_CRON. */
+    checkIntervalHours: real("checkIntervalHours").notNull().default(1),
     /** Sole eligibility clock for scheduled runs; advanced by fixed interval after success. Null = due immediately. */
     nextCheckDueAt: integer("nextCheckDueAt", { mode: "timestamp_ms" }),
     lastCheckedAt: integer("lastCheckedAt", { mode: "timestamp_ms" }),

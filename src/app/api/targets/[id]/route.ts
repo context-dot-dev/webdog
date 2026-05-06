@@ -32,7 +32,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 const patchSchema = z
   .object({
     enabled: z.boolean().optional(),
-    checkIntervalHours: z.number().int().min(1).max(8760).optional(),
+    checkIntervalHours: z.number().min(0.25).max(8760).optional(),
     notificationDestinationId: z.union([z.string().min(1), z.null()]).optional(),
     linkScope: z.enum(["NEW", "REMOVED", "BOTH"]).optional(),
     externalNotify: z.boolean().optional(),
