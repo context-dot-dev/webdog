@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
@@ -13,6 +13,7 @@ import { RelativeTime } from "@/components/relative-time";
 import { ExpandableText } from "@/components/expandable-text";
 import { buildProductPriceSeries } from "@/lib/product-price-history";
 import { buildFetchHistoryForTarget } from "@/lib/target-fetch-history";
+import { MarkAllAlertsReadButton } from "@/components/mark-all-alerts-read-button";
 export default async function WebsiteDetailPage({
   params,
   searchParams,
@@ -32,9 +33,13 @@ export default async function WebsiteDetailPage({
     .limit(1);
   if (!website) notFound();
 
-  const [targets, alerts, recentSnapshots, notificationDestChoices] = await Promise.all([
+  const [targets, alerts, unreadAlertsCountRow, recentSnapshots, notificationDestChoices] = await Promise.all([
     db.select().from(schema.target).where(eq(schema.target.websiteId, id)).orderBy(desc(schema.target.createdAt)),
     db.select().from(schema.alert).where(eq(schema.alert.websiteId, id)).orderBy(desc(schema.alert.createdAt)).limit(50),
+    db
+      .select({ n: sql<number>`count(*)`.mapWith(Number) })
+      .from(schema.alert)
+      .where(and(eq(schema.alert.websiteId, id), eq(schema.alert.read, false))),
     db
       .select()
       .from(schema.snapshot)
@@ -51,6 +56,8 @@ export default async function WebsiteDetailPage({
       .where(eq(schema.notificationDestination.userId, user.id))
       .orderBy(asc(schema.notificationDestination.name)),
   ]);
+
+  const unreadAlertsCount = unreadAlertsCountRow[0]?.n ?? 0;
 
   // Derive last-run status. All targets touched in a single runWebsiteChecks()
   // batch get their lastCheckedAt set together, so the max is the run timestamp.
@@ -177,7 +184,7 @@ export default async function WebsiteDetailPage({
       </section>
 
       <section className="mt-12" aria-labelledby="alerts-heading">
-        <div className="flex items-end justify-between">
+        <div className="flex items-end justify-between gap-4">
           <div>
             <h2 id="alerts-heading" className="text-base font-semibold text-neutral-900">
               Alerts
@@ -191,6 +198,7 @@ export default async function WebsiteDetailPage({
               )}
             </p>
           </div>
+          <MarkAllAlertsReadButton websiteId={id} unreadCount={unreadAlertsCount} />
         </div>
 
         {alerts.length === 0 ? (

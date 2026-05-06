@@ -45,6 +45,10 @@ export function AlertItem({
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    setRead(alert.read);
+  }, [alert.read]);
+
+  useEffect(() => {
     if (!highlighted || !ref.current) return;
     if (scrollToDiff && expanded) {
       const id = window.setTimeout(() => {

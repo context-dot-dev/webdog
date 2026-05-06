@@ -5,19 +5,22 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
+import { UnreadAlertsNavBadge } from "@/components/top-nav";
 
 const links = [
   { href: "/dashboard", label: "Websites" },
   { href: "/dashboard/alerts", label: "Alerts" },
   { href: "/dashboard/settings", label: "Settings" },
-];
+] as const;
 
 export function MobileNav({
   user,
   avatarLogoUrl,
+  unreadAlertCount = 0,
 }: {
   user: { name: string; email: string };
   avatarLogoUrl?: string | null;
+  unreadAlertCount?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -83,19 +86,26 @@ export function MobileNav({
                 const active =
                   pathname === href ||
                   (href !== "/dashboard" && pathname.startsWith(href));
+                const alertsUnread = href === "/dashboard/alerts" ? unreadAlertCount : 0;
                 return (
                   <Link
                     key={href}
                     href={href}
                     onClick={() => setOpen(false)}
                     aria-current={active ? "page" : undefined}
-                    className={`rounded-lg px-2.5 py-2 text-sm transition ${
+                    aria-label={
+                      alertsUnread > 0 ? `${label}, ${alertsUnread} unread` : undefined
+                    }
+                    className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition ${
                       active
                         ? "bg-neutral-100 text-neutral-900"
                         : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
                     }`}
                   >
-                    {label}
+                    <span>{label}</span>
+                    {href === "/dashboard/alerts" ? (
+                      <UnreadAlertsNavBadge count={unreadAlertCount} />
+                    ) : null}
                   </Link>
                 );
               })}

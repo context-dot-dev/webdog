@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
@@ -29,6 +29,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/onboarding/context-dev");
   }
 
+  const [unreadRow] = await db
+    .select({ n: sql<number>`count(*)`.mapWith(Number) })
+    .from(schema.alert)
+    .innerJoin(schema.website, eq(schema.website.id, schema.alert.websiteId))
+    .where(and(eq(schema.website.userId, user.id), eq(schema.alert.read, false)));
+
+  const unreadAlertCount = unreadRow?.n ?? 0;
+
   return (
     <div className="isolate min-h-dvh bg-neutral-50/50 antialiased">
       <header className="sticky top-0 z-40 border-b border-neutral-950/5 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70">
@@ -44,7 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </span>
           </Link>
           <span aria-hidden className="hidden h-5 w-px bg-neutral-950/10 lg:inline-block" />
-          <TopNav className="hidden lg:flex" />
+          <TopNav className="hidden lg:flex" unreadAlertCount={unreadAlertCount} />
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden lg:block">
               <HeaderUserMenu
@@ -53,7 +61,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
               />
             </div>
             <div className="lg:hidden">
-              <MobileNav user={{ name: user.name, email: user.email }} avatarLogoUrl={profile.avatarLogoUrl ?? user.image ?? null} />
+              <MobileNav
+                user={{ name: user.name, email: user.email }}
+                avatarLogoUrl={profile.avatarLogoUrl ?? user.image ?? null}
+                unreadAlertCount={unreadAlertCount}
+              />
             </div>
           </div>
         </div>
