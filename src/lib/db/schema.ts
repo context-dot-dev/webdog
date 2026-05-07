@@ -1,5 +1,13 @@
 import { sql } from "drizzle-orm";
-import { integer, real, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import {
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/sqlite-core";
 
 /* ------------------------------------------------------------------ */
 /* BetterAuth core tables — field names follow the BetterAuth defaults. */
@@ -231,6 +239,58 @@ export const alert = sqliteTable(
   (t) => ({
     byWebsite: index("alert_website_idx").on(t.websiteId, t.createdAt),
     byTarget: index("alert_target_idx").on(t.targetId),
+  }),
+);
+
+/** Additional users invited to operate on rows keyed by ownerUserId (same as website.userId for that account). */
+export const accountMembership = sqliteTable(
+  "accountMembership",
+  {
+    ownerUserId: text("ownerUserId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    memberUserId: text("memberUserId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.ownerUserId, t.memberUserId] }),
+    byMember: index("account_membership_member_idx").on(t.memberUserId),
+  }),
+);
+
+/**
+ * Multi-seat time-limited invite; store only tokenHash of the opaque token shown in URL.
+ * `organizationLabel` is a snapshot for auth-page copy when the invite is opened without login.
+ */
+export const accountInvite = sqliteTable(
+  "accountInvite",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("ownerUserId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    tokenHash: text("tokenHash").notNull().unique(),
+    expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    createdByUserId: text("createdByUserId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Display name copied at invite time (website title/name or profile name); never inferred from APIs here. */
+    organizationLabel: text("organizationLabel"),
+    maxUses: integer("maxUses").notNull().default(5),
+    useCount: integer("useCount").notNull().default(0),
+    redeemedAt: integer("redeemedAt", { mode: "timestamp_ms" }),
+    redeemedByUserId: text("redeemedByUserId").references(() => user.id, { onDelete: "set null" }),
+  },
+  (t) => ({
+    byOwner: index("account_invite_owner_idx").on(t.ownerUserId),
+    byExpires: index("account_invite_expires_idx").on(t.expiresAt),
   }),
 );
 

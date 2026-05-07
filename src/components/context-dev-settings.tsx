@@ -43,7 +43,7 @@ export function ContextDevSettings({
 
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-medium text-neutral-900">context.dev</h2>
+      <h2 className="text-sm font-medium text-neutral-900">Context.dev</h2>
       <p className="mt-1 text-sm text-neutral-600">
         Used to scrape sitemaps, page content, and brand data.{" "}
         <a

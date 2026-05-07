@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { getApiUser, badRequest, notFound, parseJson } from "@/lib/api";
+import { badRequest, notFound, parseJson, requireApiUserWithWriteOwner } from "@/lib/api";
 import {
   ALERT_WEBHOOK_TEST_BODY,
   isValidAlertWebhookUrl,
@@ -22,8 +22,8 @@ const EMAIL_TEST_TEXT =
   "This is a test message from Web Watchdog.\n\nIf you received this, your Resend integration is working.";
 
 export async function POST(req: Request) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
 
   const parsed = await parseJson(req, bodySchema);
   if (parsed.response) return parsed.response;
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     .where(
       and(
         eq(schema.notificationDestination.id, parsed.data.destinationId),
-        eq(schema.notificationDestination.userId, user.id),
+        eq(schema.notificationDestination.userId, ownerId),
       ),
     )
     .limit(1);
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   const [settings] = await db
     .select({ resendApiKey: schema.userNotificationSettings.resendApiKey })
     .from(schema.userNotificationSettings)
-    .where(eq(schema.userNotificationSettings.userId, user.id))
+    .where(eq(schema.userNotificationSettings.userId, ownerId))
     .limit(1);
 
   if (dest.channel === "SLACK") {

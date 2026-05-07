@@ -3,7 +3,8 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { badRequest, getApiUser, parseJson } from "@/lib/api";
+import { badRequest, getApiUser, parseJson, requireApiUserWithWriteOwner } from "@/lib/api";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 import { newId } from "@/lib/ids";
 import {
   ContextDevError,
@@ -33,7 +34,7 @@ export async function GET() {
       alertCount: sql<number>`(SELECT COUNT(*) FROM ${schema.alert} WHERE ${schema.alert.websiteId} = ${schema.website.id} AND ${schema.alert.read} = 0)`,
     })
     .from(schema.website)
-    .where(eq(schema.website.userId, user.id))
+    .where(websiteOwnerAccessible(user.id))
     .orderBy(desc(schema.website.createdAt));
 
   return NextResponse.json({ websites: rows });
@@ -44,8 +45,8 @@ const createSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
 
   const parsed = await parseJson(req, createSchema);
   if (parsed.response) return parsed.response;
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
   const [settings] = await db
     .select({ contextDevApiKey: schema.userNotificationSettings.contextDevApiKey })
     .from(schema.userNotificationSettings)
-    .where(eq(schema.userNotificationSettings.userId, user.id))
+    .where(eq(schema.userNotificationSettings.userId, ownerId))
     .limit(1);
   const contextKey = settings?.contextDevApiKey?.trim() || null;
 
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
   const id = newId("web");
   await db.insert(schema.website).values({
     id,
-    userId: user.id,
+    userId: ownerId,
     name: assets.title ?? domain,
     url: `https://${domain}`,
     domain,
@@ -112,7 +113,7 @@ export async function POST(req: Request) {
   const [created] = await db
     .select()
     .from(schema.website)
-    .where(and(eq(schema.website.id, id), eq(schema.website.userId, user.id)))
+    .where(and(eq(schema.website.id, id), eq(schema.website.userId, ownerId), websiteOwnerAccessible(user.id)))
     .limit(1);
 
   return NextResponse.json({ website: created }, { status: 201 });

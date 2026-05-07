@@ -4,25 +4,32 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import type { LinkScope } from "@/lib/db/schema";
 import * as schema from "@/lib/db/schema";
-import { badRequest, getApiUser, notFound, parseJson } from "@/lib/api";
+import { badRequest, notFound, parseJson, requireApiUserWithWriteOwner } from "@/lib/api";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 import { computeNextCheckDueAfterSuccess } from "@/lib/scraper";
 
-async function loadOwned(userId: string, targetId: string) {
+async function loadForWrite(sessionUserId: string, ownerId: string, targetId: string) {
   const rows = await db
     .select({ target: schema.target, website: schema.website })
     .from(schema.target)
     .innerJoin(schema.website, eq(schema.website.id, schema.target.websiteId))
-    .where(and(eq(schema.target.id, targetId), eq(schema.website.userId, userId)))
+    .where(
+      and(
+        eq(schema.target.id, targetId),
+        eq(schema.website.userId, ownerId),
+        websiteOwnerAccessible(sessionUserId),
+      ),
+    )
     .limit(1);
   return rows[0] ?? null;
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
   const { id } = await params;
 
-  const owned = await loadOwned(user.id, id);
+  const owned = await loadForWrite(user.id, ownerId, id);
   if (!owned) return notFound("Target not found");
 
   await db.delete(schema.target).where(eq(schema.target.id, id));
@@ -50,11 +57,11 @@ const patchSchema = z
   );
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
   const { id } = await params;
 
-  const owned = await loadOwned(user.id, id);
+  const owned = await loadForWrite(user.id, ownerId, id);
   if (!owned) return notFound("Target not found");
 
   const parsed = await parseJson(req, patchSchema);
@@ -74,7 +81,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       .where(
         and(
           eq(schema.notificationDestination.id, nidPart),
-          eq(schema.notificationDestination.userId, user.id),
+          eq(schema.notificationDestination.userId, ownerId),
         ),
       )
       .limit(1);

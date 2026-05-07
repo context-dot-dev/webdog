@@ -3,7 +3,8 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { badRequest, getApiUser, notFound, parseJson } from "@/lib/api";
+import { badRequest, getApiUser, notFound, parseJson, requireApiUserWithWriteOwner } from "@/lib/api";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 import { stringifyWebsiteNotificationDestinationIds } from "@/lib/website-notification-destinations";
 
 const patchSchema = z.object({
@@ -18,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const [website] = await db
     .select()
     .from(schema.website)
-    .where(and(eq(schema.website.id, id), eq(schema.website.userId, user.id)))
+    .where(and(eq(schema.website.id, id), websiteOwnerAccessible(user.id)))
     .limit(1);
   if (!website) return notFound("Website not found");
 
@@ -36,14 +37,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
   const { id } = await params;
 
   const [website] = await db
     .select()
     .from(schema.website)
-    .where(and(eq(schema.website.id, id), eq(schema.website.userId, user.id)))
+    .where(and(eq(schema.website.id, id), eq(schema.website.userId, ownerId), websiteOwnerAccessible(user.id)))
     .limit(1);
   if (!website) return notFound("Website not found");
 
@@ -57,7 +58,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       .from(schema.notificationDestination)
       .where(
         and(
-          eq(schema.notificationDestination.userId, user.id),
+          eq(schema.notificationDestination.userId, ownerId),
           inArray(schema.notificationDestination.id, ids),
         ),
       );
@@ -84,13 +85,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
   const { id } = await params;
 
   const result = await db
     .delete(schema.website)
-    .where(and(eq(schema.website.id, id), eq(schema.website.userId, user.id)));
+    .where(
+      and(eq(schema.website.id, id), eq(schema.website.userId, ownerId), websiteOwnerAccessible(user.id)),
+    );
   if (result.changes === 0) return notFound("Website not found");
   return NextResponse.json({ ok: true });
 }

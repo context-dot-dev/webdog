@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { getApiUser, notFound, parseJson } from "@/lib/api";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 import { runWebsiteChecks } from "@/lib/scraper";
 
 const bodySchema = z.object({
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
   const [website] = await db
     .select({ id: schema.website.id })
     .from(schema.website)
-    .where(and(eq(schema.website.id, parsed.data.websiteId), eq(schema.website.userId, user.id)))
+    .where(and(eq(schema.website.id, parsed.data.websiteId), websiteOwnerAccessible(user.id)))
     .limit(1);
   if (!website) return notFound("Website not found");
 

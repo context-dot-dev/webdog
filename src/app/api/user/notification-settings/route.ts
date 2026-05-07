@@ -3,7 +3,9 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { getApiUser, badRequest, parseJson } from "@/lib/api";
+import { badRequest, getApiUser, parseJson, requireApiUserWithWriteOwner } from "@/lib/api";
+import { accountOwnerColumnAccessible } from "@/lib/account-access";
+import { getEffectiveAccountOwnerForWrites } from "@/lib/effective-account";
 import { ContextDevError, resolveAccountBrandLogoUrl } from "@/lib/context-client";
 
 const patchSchema = z.object({
@@ -27,24 +29,38 @@ export async function GET() {
   const { user, response } = await getApiUser();
   if (!user) return response;
 
-  const [row] = await db
+  const rows = await db
     .select({
+      ownerUserId: schema.userNotificationSettings.userId,
       contextDevApiKey: schema.userNotificationSettings.contextDevApiKey,
       resendApiKey: schema.userNotificationSettings.resendApiKey,
     })
     .from(schema.userNotificationSettings)
-    .where(eq(schema.userNotificationSettings.userId, user.id))
-    .limit(1);
+    .where(accountOwnerColumnAccessible(schema.userNotificationSettings.userId, user.id));
+
+  let contextDevApiKey: string | null = null;
+  let resendApiKey: string | null = null;
+  if (rows.length === 1) {
+    contextDevApiKey = rows[0]!.contextDevApiKey ?? null;
+    resendApiKey = rows[0]!.resendApiKey ?? null;
+  } else if (rows.length > 1) {
+    const scope = await getEffectiveAccountOwnerForWrites(user.id);
+    if (scope.ok) {
+      const row = rows.find((r) => r.ownerUserId === scope.ownerId);
+      contextDevApiKey = row?.contextDevApiKey ?? null;
+      resendApiKey = row?.resendApiKey ?? null;
+    }
+  }
 
   return NextResponse.json({
-    contextDevApiKey: row?.contextDevApiKey ?? null,
-    resendApiKey: row?.resendApiKey ?? null,
+    contextDevApiKey,
+    resendApiKey,
   });
 }
 
 export async function PATCH(req: Request) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
 
   const parsed = await parseJson(req, patchSchema);
   if (parsed.response) return parsed.response;
@@ -60,7 +76,7 @@ export async function PATCH(req: Request) {
       resendApiKey: schema.userNotificationSettings.resendApiKey,
     })
     .from(schema.userNotificationSettings)
-    .where(eq(schema.userNotificationSettings.userId, user.id))
+    .where(eq(schema.userNotificationSettings.userId, ownerId))
     .limit(1);
 
   let contextKey = existing?.contextDevApiKey ?? null;
@@ -77,11 +93,18 @@ export async function PATCH(req: Request) {
   if (keyIn !== undefined) {
     if (!contextKey) {
       refreshedBrandLogoUrl = null;
-    } else if (!user.email) {
-      return badRequest("Add an email to your account before saving a Context.dev key");
     } else {
+      const [ownerProfile] = await db
+        .select({ email: schema.user.email })
+        .from(schema.user)
+        .where(eq(schema.user.id, ownerId))
+        .limit(1);
+      const ownerEmail = ownerProfile?.email?.trim() ?? "";
+      if (!ownerEmail) {
+        return badRequest("Account owner must have an email before saving a Context.dev key");
+      }
       try {
-        refreshedBrandLogoUrl = await resolveAccountBrandLogoUrl(user.email, contextKey);
+        refreshedBrandLogoUrl = await resolveAccountBrandLogoUrl(ownerEmail, contextKey);
       } catch (e) {
         if (e instanceof ContextDevError) {
           const status = e.status === 401 || e.status === 403 ? e.status : 400;
@@ -97,7 +120,7 @@ export async function PATCH(req: Request) {
   await db
     .insert(schema.userNotificationSettings)
     .values({
-      userId: user.id,
+      userId: ownerId,
       contextDevApiKey: contextKey,
       resendApiKey: resendKey,
       updatedAt: now,

@@ -3,7 +3,10 @@ import { redirect } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
+import { websiteOwnerAccessible } from "@/lib/account-access";
+import { getEffectiveAccountOwnerForWrites, loadAccountChoices } from "@/lib/effective-account";
 import { requireUser } from "@/lib/session";
+import { AccountSwitcher } from "@/components/account-switcher";
 import { LogoMark } from "@/components/logo";
 import { MobileNav } from "@/components/mobile-nav";
 import { TopNav } from "@/components/top-nav";
@@ -12,17 +15,24 @@ import { HeaderUserMenu } from "@/components/header-user-menu";
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
 
+  const logoScope = await getEffectiveAccountOwnerForWrites(user.id);
+  const logoOwnerId = logoScope.ok ? logoScope.ownerId : user.id;
+  const accountChoices = await loadAccountChoices(user.id);
+
   const [profile] = await db
     .select({
       dismissed: schema.user.contextIntroDismissedAt,
-      avatarLogoUrl: schema.userNotificationSettings.accountBrandLogoUrl,
     })
     .from(schema.user)
-    .leftJoin(
-      schema.userNotificationSettings,
-      eq(schema.userNotificationSettings.userId, schema.user.id),
-    )
     .where(eq(schema.user.id, user.id))
+    .limit(1);
+
+  const [logoRow] = await db
+    .select({
+      avatarLogoUrl: schema.userNotificationSettings.accountBrandLogoUrl,
+    })
+    .from(schema.userNotificationSettings)
+    .where(eq(schema.userNotificationSettings.userId, logoOwnerId))
     .limit(1);
 
   if (!profile?.dismissed) {
@@ -33,7 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .select({ n: sql<number>`count(*)`.mapWith(Number) })
     .from(schema.alert)
     .innerJoin(schema.website, eq(schema.website.id, schema.alert.websiteId))
-    .where(and(eq(schema.website.userId, user.id), eq(schema.alert.read, false)));
+    .where(and(websiteOwnerAccessible(user.id), eq(schema.alert.read, false)));
 
   const unreadAlertCount = unreadRow?.n ?? 0;
 
@@ -53,18 +63,25 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </Link>
           <span aria-hidden className="hidden h-5 w-px bg-neutral-950/10 lg:inline-block" />
           <TopNav className="hidden lg:flex" unreadAlertCount={unreadAlertCount} />
+          <AccountSwitcher
+            className="hidden lg:flex"
+            choices={accountChoices}
+            activeOwnerId={logoScope.ok ? logoScope.ownerId : undefined}
+          />
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden lg:block">
               <HeaderUserMenu
                 user={{ name: user.name, email: user.email }}
-                avatarLogoUrl={profile.avatarLogoUrl ?? user.image ?? null}
+                avatarLogoUrl={logoRow?.avatarLogoUrl ?? user.image ?? null}
               />
             </div>
             <div className="lg:hidden">
               <MobileNav
                 user={{ name: user.name, email: user.email }}
-                avatarLogoUrl={profile.avatarLogoUrl ?? user.image ?? null}
+                avatarLogoUrl={logoRow?.avatarLogoUrl ?? user.image ?? null}
                 unreadAlertCount={unreadAlertCount}
+                accountChoices={accountChoices}
+                activeAccountOwnerId={logoScope.ok ? logoScope.ownerId : undefined}
               />
             </div>
           </div>

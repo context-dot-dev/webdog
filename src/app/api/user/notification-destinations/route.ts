@@ -3,7 +3,8 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { getApiUser, badRequest, parseJson } from "@/lib/api";
+import { badRequest, getApiUser, parseJson, requireApiUserWithWriteOwner } from "@/lib/api";
+import { accountOwnerColumnAccessible } from "@/lib/account-access";
 import { newId } from "@/lib/ids";
 import { isValidAlertWebhookUrl } from "@/lib/notify-outbound-webhook";
 import { normalizeResendToEmailsForStorage } from "@/lib/notify-resend";
@@ -35,15 +36,15 @@ export async function GET() {
   const rows = await db
     .select()
     .from(schema.notificationDestination)
-    .where(eq(schema.notificationDestination.userId, user.id))
+    .where(accountOwnerColumnAccessible(schema.notificationDestination.userId, user.id))
     .orderBy(desc(schema.notificationDestination.createdAt));
 
   return NextResponse.json({ destinations: rows });
 }
 
 export async function POST(req: Request) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
 
   const parsed = await parseJson(req, createSchema);
   if (parsed.response) return parsed.response;
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
     }
     await db.insert(schema.notificationDestination).values({
       id,
-      userId: user.id,
+      userId: ownerId,
       channel: "SLACK",
       name,
       slackWebhookUrl: url,
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
     }
     await db.insert(schema.notificationDestination).values({
       id,
-      userId: user.id,
+      userId: ownerId,
       channel: "EMAIL",
       name,
       slackWebhookUrl: null,
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
     }
     await db.insert(schema.notificationDestination).values({
       id,
-      userId: user.id,
+      userId: ownerId,
       channel: "WEBHOOK",
       name,
       slackWebhookUrl: null,

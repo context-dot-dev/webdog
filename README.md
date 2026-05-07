@@ -132,6 +132,10 @@ Follow **[`railway/template-publish.md`](railway/template-publish.md)** for icon
 
 In the [template composer](https://docs.railway.com/templates/create): add this repo as the service source, attach a volume at **`/data`**, enable HTTP public networking, and add a **required** variable **`CONTEXT_DEV_API_KEY`** for deployers. Optional: add **`BETTER_AUTH_SECRET=${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=`** (see [template variable functions](https://docs.railway.com/templates/create#template-variable-functions)) instead of relying on the auto-generated volume secret. Copy the **template URL** Railway gives you into your README or site for one-click deploys.
 
+## Team invites (shared accounts)
+
+There is **no outbound email product** here. Invite teammates from **Settings → Team**: that shows a shareable URL you paste into chat; the same link allows up to **five** people to join before it stops accepting new members (`INVITE_MAX_USES` in [`src/lib/invite-constants.ts`](src/lib/invite-constants.ts)), and it still expires after a TTL in that same file. A short **organization label** on the invite powers the invite sign-in/up copy (from your newest site title/name or your profile name—not a live Context.dev call). There is no automated password-reset email — ask someone who can open **Settings → Team** to send a fresh invite after a collaborator signs up again.
+
 ## Contributing
 
 Contributions are welcome. Please open an issue or pull request with a short description of the change.

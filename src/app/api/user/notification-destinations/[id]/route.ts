@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { getApiUser, badRequest, notFound, parseJson } from "@/lib/api";
+import { badRequest, notFound, parseJson, requireApiUserWithWriteOwner } from "@/lib/api";
 import { isValidAlertWebhookUrl } from "@/lib/notify-outbound-webhook";
 import { normalizeResendToEmailsForStorage } from "@/lib/notify-resend";
 import { isValidSlackIncomingWebhookUrl } from "@/lib/notify-slack";
@@ -20,15 +20,14 @@ const patchSchema = z.object({
   alertWebhookUrl: z.union([z.string(), z.null()]).optional(),
 });
 
-async function pruneDeletedDestination(userId: string, destinationId: string) {
+async function pruneDeletedDestination(ownerUserId: string, destinationId: string) {
   const sites = await db
     .select({
       id: schema.website.id,
       notificationDestinationIds: schema.website.notificationDestinationIds,
     })
     .from(schema.website)
-    .where(eq(schema.website.userId, userId));
-
+    .where(eq(schema.website.userId, ownerUserId));
   for (const s of sites) {
     const cur = parseWebsiteNotificationDestinationIds(s.notificationDestinationIds);
     if (cur === null) continue;
@@ -45,15 +44,15 @@ async function pruneDeletedDestination(userId: string, destinationId: string) {
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
   const { id } = await params;
 
   const [existing] = await db
     .select()
     .from(schema.notificationDestination)
     .where(
-      and(eq(schema.notificationDestination.id, id), eq(schema.notificationDestination.userId, user.id)),
+      and(eq(schema.notificationDestination.id, id), eq(schema.notificationDestination.userId, ownerId)),
     )
     .limit(1);
   if (!existing) return notFound("Destination not found");
@@ -154,18 +153,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
   const { id } = await params;
 
   const result = await db
     .delete(schema.notificationDestination)
     .where(
-      and(eq(schema.notificationDestination.id, id), eq(schema.notificationDestination.userId, user.id)),
+      and(eq(schema.notificationDestination.id, id), eq(schema.notificationDestination.userId, ownerId)),
     );
   if (result.changes === 0) return notFound("Destination not found");
 
-  await pruneDeletedDestination(user.id, id);
+  await pruneDeletedDestination(ownerId, id);
 
   return NextResponse.json({ ok: true });
 }

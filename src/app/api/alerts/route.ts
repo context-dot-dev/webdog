@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { getApiUser } from "@/lib/api";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 
 export async function GET() {
   const { user, response } = await getApiUser();
@@ -16,7 +17,7 @@ export async function GET() {
     })
     .from(schema.alert)
     .innerJoin(schema.website, eq(schema.website.id, schema.alert.websiteId))
-    .where(eq(schema.website.userId, user.id))
+    .where(websiteOwnerAccessible(user.id))
     .orderBy(desc(schema.alert.createdAt))
     .limit(100);
 

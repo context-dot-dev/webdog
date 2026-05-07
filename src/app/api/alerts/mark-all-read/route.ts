@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { getApiUser, notFound, parseJson } from "@/lib/api";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 
 const bodySchema = z.object({ websiteId: z.string().optional() });
 
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
     const [owned] = await db
       .select({ id: schema.website.id })
       .from(schema.website)
-      .where(and(eq(schema.website.id, websiteId), eq(schema.website.userId, user.id)))
+      .where(and(eq(schema.website.id, websiteId), websiteOwnerAccessible(user.id)))
       .limit(1);
     if (!owned) return notFound("Website not found");
 
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
     const sites = await db
       .select({ id: schema.website.id })
       .from(schema.website)
-      .where(eq(schema.website.userId, user.id));
+      .where(websiteOwnerAccessible(user.id));
     const ids = sites.map((s) => s.id);
     if (ids.length > 0) {
       await db

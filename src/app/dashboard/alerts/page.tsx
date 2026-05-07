@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
 import { AlertItem } from "@/components/alert-item";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 import { MarkAllAlertsReadButton } from "@/components/mark-all-alerts-read-button";
 
 export default async function AlertsPage({
@@ -24,14 +25,14 @@ export default async function AlertsPage({
       })
       .from(schema.alert)
       .innerJoin(schema.website, eq(schema.website.id, schema.alert.websiteId))
-      .where(eq(schema.website.userId, user.id))
+      .where(websiteOwnerAccessible(user.id))
       .orderBy(desc(schema.alert.createdAt))
       .limit(100),
     db
       .select({ n: sql<number>`count(*)`.mapWith(Number) })
       .from(schema.alert)
       .innerJoin(schema.website, eq(schema.website.id, schema.alert.websiteId))
-      .where(and(eq(schema.website.userId, user.id), eq(schema.alert.read, false))),
+      .where(and(websiteOwnerAccessible(user.id), eq(schema.alert.read, false))),
   ]);
 
   const unreadAlertsCount = unreadRow[0]?.n ?? 0;

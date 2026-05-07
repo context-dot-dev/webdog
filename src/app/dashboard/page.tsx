@@ -1,6 +1,7 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 import { requireUser } from "@/lib/session";
 import { WebsiteListView } from "@/components/website-list-view";
 
@@ -48,7 +49,7 @@ export default async function DashboardPage() {
     .from(schema.website)
     .leftJoin(targetStats, eq(targetStats.websiteId, schema.website.id))
     .leftJoin(alertStats, eq(alertStats.websiteId, schema.website.id))
-    .where(eq(schema.website.userId, user.id))
+    .where(websiteOwnerAccessible(user.id))
     .orderBy(desc(schema.website.createdAt));
 
   return (

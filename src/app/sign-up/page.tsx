@@ -1,12 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentSession } from "@/lib/session";
 import { Logo } from "@/components/logo";
+import { previewInviteFromRawToken } from "@/lib/account-invite-preview";
+import { signUpInviteSubtitle } from "@/lib/auth-invite-copy";
+import { getCurrentSession } from "@/lib/session";
 import { SignUpForm } from "./form";
 
-export default async function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invite?: string }>;
+}) {
   const session = await getCurrentSession();
   if (session?.user) redirect("/dashboard");
+
+  const { invite } = await searchParams;
+  const inviteToken = invite?.trim() || null;
+  const invitePreview = inviteToken ? await previewInviteFromRawToken(inviteToken) : null;
 
   return (
     <main className="grid min-h-dvh grid-cols-1 bg-white lg:grid-cols-[1fr_42%]">
@@ -16,11 +26,14 @@ export default async function SignUpPage() {
         </Link>
         <div className="mx-auto w-full max-w-xs">
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Create your account</h1>
-          <p className="mt-1 text-sm text-neutral-600">Start watching the web in under a minute.</p>
-          <SignUpForm className="mt-8" />
+          <p className="mt-1 text-sm text-neutral-600">{signUpInviteSubtitle(inviteToken, invitePreview)}</p>
+          <SignUpForm className="mt-8" inviteToken={inviteToken} />
           <p className="mt-6 text-sm text-neutral-600">
             Already have an account?{" "}
-            <Link href="/sign-in" className="font-medium text-brand-600 hover:text-brand-700">
+            <Link
+              href={inviteToken ? `/sign-in?invite=${encodeURIComponent(inviteToken)}` : "/sign-in"}
+              className="font-medium text-brand-600 hover:text-brand-700"
+            >
               Sign in
             </Link>
           </p>

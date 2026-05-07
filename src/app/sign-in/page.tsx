@@ -1,12 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentSession } from "@/lib/session";
 import { Logo } from "@/components/logo";
+import { previewInviteFromRawToken } from "@/lib/account-invite-preview";
+import { signInInviteSubtitle } from "@/lib/auth-invite-copy";
+import { getCurrentSession } from "@/lib/session";
 import { SignInForm } from "./form";
 
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invite?: string }>;
+}) {
   const session = await getCurrentSession();
   if (session?.user) redirect("/dashboard");
+
+  const { invite } = await searchParams;
+  const inviteToken = invite?.trim() || null;
+  const invitePreview = inviteToken ? await previewInviteFromRawToken(inviteToken) : null;
 
   return (
     <main className="grid min-h-dvh grid-cols-1 bg-white lg:grid-cols-[1fr_42%]">
@@ -16,11 +26,14 @@ export default async function SignInPage() {
         </Link>
         <div className="mx-auto w-full max-w-xs">
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Welcome back</h1>
-          <p className="mt-1 text-sm text-neutral-600">Sign in to your Web Watchdog account.</p>
-          <SignInForm className="mt-8" />
+          <p className="mt-1 text-sm text-neutral-600">{signInInviteSubtitle(inviteToken, invitePreview)}</p>
+          <SignInForm className="mt-8" inviteToken={inviteToken} />
           <p className="mt-6 text-sm text-neutral-600">
             New here?{" "}
-            <Link href="/sign-up" className="font-medium text-brand-600 hover:text-brand-700">
+            <Link
+              href={inviteToken ? `/sign-up?invite=${encodeURIComponent(inviteToken)}` : "/sign-up"}
+              className="font-medium text-brand-600 hover:text-brand-700"
+            >
               Create an account
             </Link>
           </p>

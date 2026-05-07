@@ -6,7 +6,13 @@ import { authClient } from "@/lib/auth-client";
 import { formatCredentialAuthUiError } from "@/lib/auth-ui-error";
 import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
 
-export function SignUpForm({ className = "" }: { className?: string }) {
+export function SignUpForm({
+  className = "",
+  inviteToken = null,
+}: {
+  className?: string;
+  inviteToken?: string | null;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,7 +33,11 @@ export function SignUpForm({ className = "" }: { className?: string }) {
           );
           return;
         }
-        router.push("/onboarding/context-dev");
+        const next =
+          inviteToken && inviteToken.trim().length > 0
+            ? `/invite/${encodeURIComponent(inviteToken.trim())}`
+            : "/onboarding/context-dev";
+        router.push(next);
         router.refresh();
       } catch (caught) {
         setError(formatCredentialAuthUiError(caughtUnknownMessage(caught)));

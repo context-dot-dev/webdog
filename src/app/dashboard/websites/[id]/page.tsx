@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
 import { AddTargetDialog } from "@/components/add-target-dialog";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 import { TargetRow } from "@/components/target-row";
 import { AlertItem } from "@/components/alert-item";
 import { RunNowButton } from "@/components/run-now-button";
@@ -29,7 +30,7 @@ export default async function WebsiteDetailPage({
   const [website] = await db
     .select()
     .from(schema.website)
-    .where(and(eq(schema.website.id, id), eq(schema.website.userId, user.id)))
+    .where(and(eq(schema.website.id, id), websiteOwnerAccessible(user.id)))
     .limit(1);
   if (!website) notFound();
 
@@ -53,7 +54,7 @@ export default async function WebsiteDetailPage({
         name: schema.notificationDestination.name,
       })
       .from(schema.notificationDestination)
-      .where(eq(schema.notificationDestination.userId, user.id))
+      .where(eq(schema.notificationDestination.userId, website.userId))
       .orderBy(asc(schema.notificationDestination.name)),
   ]);
 

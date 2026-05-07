@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
 import { UnreadAlertsNavBadge } from "@/components/top-nav";
+import type { AccountChoice } from "@/lib/effective-account";
+import { AccountSwitcher } from "@/components/account-switcher";
 
 const links = [
   { href: "/dashboard", label: "Websites" },
@@ -17,10 +19,14 @@ export function MobileNav({
   user,
   avatarLogoUrl,
   unreadAlertCount = 0,
+  accountChoices = [],
+  activeAccountOwnerId,
 }: {
   user: { name: string; email: string };
   avatarLogoUrl?: string | null;
   unreadAlertCount?: number;
+  accountChoices?: AccountChoice[];
+  activeAccountOwnerId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -110,6 +116,15 @@ export function MobileNav({
                 );
               })}
             </nav>
+            {(accountChoices?.length ?? 0) > 1 ? (
+              <div className="border-t border-neutral-950/5 px-3 py-2">
+                <AccountSwitcher
+                  choices={accountChoices}
+                  activeOwnerId={activeAccountOwnerId}
+                  className="flex w-full"
+                />
+              </div>
+            ) : null}
             <div className="flex items-center gap-3 border-t border-neutral-950/5 p-3">
             <div
               className={

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getEffectiveAccountOwnerForWrites } from "./effective-account";
 import { getCurrentSession } from "./session";
 
 export async function getApiUser() {
@@ -8,6 +9,28 @@ export async function getApiUser() {
     return { user: null, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
   return { user: session.user, response: null };
+}
+
+/**
+ * User + account owner id for mutations (notification settings, websites keyed by owner).
+ * Fails with 400 when several shared accounts need an explicit choice (set `wd_account` cookie).
+ */
+export async function requireApiUserWithWriteOwner() {
+  const auth = await getApiUser();
+  if (!auth.user) return { ...auth, ownerId: null as string | null };
+
+  const scope = await getEffectiveAccountOwnerForWrites(auth.user.id);
+  if (!scope.ok) {
+    return {
+      user: auth.user,
+      ownerId: null,
+      response: NextResponse.json(
+        { error: scope.message, needsAccountSelection: true },
+        { status: 400 },
+      ),
+    };
+  }
+  return { user: auth.user, ownerId: scope.ownerId, response: null };
 }
 
 export function badRequest(message: string, details?: unknown) {

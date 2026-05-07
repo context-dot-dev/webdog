@@ -3,7 +3,8 @@ import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { getApiUser, notFound, parseJson, badRequest } from "@/lib/api";
+import { notFound, parseJson, badRequest, requireApiUserWithWriteOwner } from "@/lib/api";
+import { websiteOwnerAccessible } from "@/lib/account-access";
 import { newId } from "@/lib/ids";
 
 const createSchema = z.discriminatedUnion("category", [
@@ -30,7 +31,7 @@ const createSchema = z.discriminatedUnion("category", [
 ]);
 
 async function resolveNotificationDestinationId(
-  userId: string,
+  ownerUserId: string,
   provided: string | undefined,
 ): Promise<string | null> {
   const t = provided?.trim();
@@ -41,7 +42,7 @@ async function resolveNotificationDestinationId(
       .where(
         and(
           eq(schema.notificationDestination.id, t),
-          eq(schema.notificationDestination.userId, userId),
+          eq(schema.notificationDestination.userId, ownerUserId),
         ),
       )
       .limit(1);
@@ -51,20 +52,20 @@ async function resolveNotificationDestinationId(
   const rows = await db
     .select({ id: schema.notificationDestination.id })
     .from(schema.notificationDestination)
-    .where(eq(schema.notificationDestination.userId, userId));
+    .where(eq(schema.notificationDestination.userId, ownerUserId));
   if (rows.length === 1) return rows[0].id;
   return null;
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await getApiUser();
-  if (!user) return response;
+  const { user, ownerId, response } = await requireApiUserWithWriteOwner();
+  if (!user || !ownerId) return response!;
   const { id } = await params;
 
   const [website] = await db
     .select()
     .from(schema.website)
-    .where(and(eq(schema.website.id, id), eq(schema.website.userId, user.id)))
+    .where(and(eq(schema.website.id, id), eq(schema.website.userId, ownerId), websiteOwnerAccessible(user.id)))
     .limit(1);
   if (!website) return notFound("Website not found");
 
@@ -78,7 +79,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   let destId: string | null = null;
   if (wantOutbound) {
-    destId = await resolveNotificationDestinationId(user.id, parsed.data.notificationDestinationId);
+    destId = await resolveNotificationDestinationId(ownerId, parsed.data.notificationDestinationId);
     if (!destId) {
       return badRequest(
         "Select a notification destination, or add exactly one in Settings to use it by default.",
