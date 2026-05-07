@@ -54,7 +54,7 @@ export function ContextDevSettings({
         >
           Get an API key
         </a>{" "}
-        — or set <code className="kbd">CONTEXT_DEV_API_KEY</code> on the server to apply to all users without storing a key here.
+        — or set <code className="kbd">CONTEXT_DEV_API_KEY</code> on the server to apply to all users.
       </p>
       <div className="mt-3 overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-950/5">
         <div className="p-5">
