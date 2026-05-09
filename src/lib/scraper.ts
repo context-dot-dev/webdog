@@ -14,6 +14,7 @@ import { dispatchNewAlertsForDestinations } from "./dispatch-new-alerts";
 import { resolveDestinationsForTarget } from "./website-notification-destinations";
 import { authPublicBaseUrl } from "./auth";
 import { buildNewAlertsPayload, type NewAlertsAlert } from "./notification-new-alerts";
+import { appendAlertPostfix } from "./server-managed-config";
 
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
@@ -136,7 +137,9 @@ async function handleLinkTarget(
       websiteId: website.id,
       targetId: target.id,
       kind: "NEW_LINK",
-      title: `${added.length} new link${added.length === 1 ? "" : "s"} on ${website.domain}`,
+      title: appendAlertPostfix(
+        `${added.length} new link${added.length === 1 ? "" : "s"} on ${website.domain}`,
+      ),
       details: JSON.stringify({ added: added.slice(0, 100) }),
       createdAt: now,
     });
@@ -147,7 +150,9 @@ async function handleLinkTarget(
       websiteId: website.id,
       targetId: target.id,
       kind: "REMOVED_LINK",
-      title: `${removed.length} link${removed.length === 1 ? "" : "s"} removed from ${website.domain}`,
+      title: appendAlertPostfix(
+        `${removed.length} link${removed.length === 1 ? "" : "s"} removed from ${website.domain}`,
+      ),
       details: JSON.stringify({ removed: removed.slice(0, 100) }),
       createdAt: now,
     });
@@ -172,7 +177,7 @@ async function handleContentTarget(
         websiteId: website.id,
         targetId: target.id,
         kind: "PAGE_CONTENT",
-        title: `Content changed on ${page}`,
+        title: appendAlertPostfix(`Content changed on ${page}`),
         details: JSON.stringify({ pageUrl: page, diffPreview: preview, totalAdded, totalRemoved }),
         createdAt: new Date(),
       });
@@ -218,7 +223,9 @@ async function handleProductPriceTarget(
       websiteId: website.id,
       targetId: target.id,
       kind: "PRODUCT_PRICE",
-      title: `Price change: ${name} (${fmt(prevData.price, prevData.currency)} → ${fmt(snap.price, snap.currency)})`,
+      title: appendAlertPostfix(
+        `Price change: ${name} (${fmt(prevData.price, prevData.currency)} → ${fmt(snap.price, snap.currency)})`,
+      ),
       details: JSON.stringify({
         pageUrl: page,
         productName: snap.productName,

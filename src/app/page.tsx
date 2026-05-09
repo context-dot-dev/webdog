@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { APP_NAME } from "@/lib/product-info";
 import { getCurrentSession } from "@/lib/session";
 
 export default async function LandingPage() {
@@ -20,7 +21,7 @@ export default async function LandingPage() {
       <header className="relative mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2.5">
           <span className="grid size-9 place-items-center rounded-2xl bg-neutral-900 text-2xl text-[#fdf6ec]">🐶</span>
-          <span className="text-lg font-semibold">Web Watchdog</span>
+          <span className="text-lg font-semibold">{APP_NAME}</span>
         </div>
         <nav className="flex items-center gap-2">
           <Link href="#features" className="rounded-full px-4 py-2 text-sm text-neutral-700 hover:bg-white/60">Features</Link>
@@ -61,7 +62,7 @@ export default async function LandingPage() {
           .
         </h1>
         <p className="mx-auto mt-8 max-w-[52ch] text-pretty text-lg text-neutral-700">
-          Web Watchdog keeps an eye on the pages you care about — a new blog
+          {APP_NAME} keeps an eye on the pages you care about — a new blog
           post, a removed job listing, a quietly tweaked pricing page — and
           gives you a friendly nudge the moment something changes.
         </p>

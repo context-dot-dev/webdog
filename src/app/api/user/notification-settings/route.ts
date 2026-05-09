@@ -7,6 +7,11 @@ import { badRequest, getApiUser, parseJson, requireApiUserWithWriteOwner } from 
 import { accountOwnerColumnAccessible } from "@/lib/account-access";
 import { getEffectiveAccountOwnerForWrites } from "@/lib/effective-account";
 import { ContextDevError, resolveAccountBrandLogoUrl } from "@/lib/context-client";
+import {
+  isContextDevApiKeyManagedByEnv,
+  isResendApiKeyManagedByEnv,
+  isResendSendFromEmailManagedByEnv,
+} from "@/lib/server-managed-config";
 
 const patchSchema = z.object({
   contextDevApiKey: z.union([z.string(), z.null()]).optional(),
@@ -28,6 +33,8 @@ function normalizeResendApiKey(input: string | null): string | null {
 export async function GET() {
   const { user, response } = await getApiUser();
   if (!user) return response;
+  const contextDevApiKeyManaged = isContextDevApiKeyManagedByEnv();
+  const resendApiKeyManaged = isResendApiKeyManagedByEnv();
 
   const rows = await db
     .select({
@@ -53,8 +60,11 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    contextDevApiKey,
-    resendApiKey,
+    contextDevApiKey: contextDevApiKeyManaged ? null : contextDevApiKey,
+    resendApiKey: resendApiKeyManaged ? null : resendApiKey,
+    contextDevApiKeyManaged,
+    resendApiKeyManaged,
+    resendSendFromEmailManaged: isResendSendFromEmailManagedByEnv(),
   });
 }
 
@@ -68,6 +78,14 @@ export async function PATCH(req: Request) {
   const { contextDevApiKey: keyIn, resendApiKey: resendIn } = parsed.data;
   if (keyIn === undefined && resendIn === undefined) {
     return badRequest("Provide contextDevApiKey and/or resendApiKey");
+  }
+  const contextDevApiKeyManaged = isContextDevApiKeyManagedByEnv();
+  const resendApiKeyManaged = isResendApiKeyManagedByEnv();
+  if (keyIn !== undefined && contextDevApiKeyManaged) {
+    return badRequest("Context.dev API access is managed by this deployment");
+  }
+  if (resendIn !== undefined && resendApiKeyManaged) {
+    return badRequest("Resend API access is managed by this deployment");
   }
 
   const [existing] = await db
@@ -138,8 +156,11 @@ export async function PATCH(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    contextDevApiKey: contextKey,
-    resendApiKey: resendKey,
+    contextDevApiKey: contextDevApiKeyManaged ? null : contextKey,
+    resendApiKey: resendApiKeyManaged ? null : resendKey,
+    contextDevApiKeyManaged,
+    resendApiKeyManaged,
+    resendSendFromEmailManaged: isResendSendFromEmailManagedByEnv(),
     ...(refreshedBrandLogoUrl !== undefined ? { accountBrandLogoUrl: refreshedBrandLogoUrl } : {}),
   });
 }

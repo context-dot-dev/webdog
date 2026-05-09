@@ -11,6 +11,12 @@ import {
   loadAccountChoices,
 } from "@/lib/effective-account";
 import { requireUser } from "@/lib/session";
+import {
+  isContextDevApiKeyManagedByEnv,
+  isResendApiKeyManagedByEnv,
+  isResendSendFromEmailManagedByEnv,
+} from "@/lib/server-managed-config";
+import { publicNotificationDestinations } from "@/lib/notification-destination-public";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -33,6 +39,9 @@ export default async function SettingsPage() {
 
   const ownerId = scope.ownerId;
   const teamManagement = canManageTeamInvites(user.id, ownerId);
+  const contextDevApiKeyManaged = isContextDevApiKeyManagedByEnv();
+  const resendApiKeyManaged = isResendApiKeyManagedByEnv();
+  const resendSendFromEmailManaged = isResendSendFromEmailManagedByEnv();
 
   const [row] = await db
     .select({
@@ -48,6 +57,7 @@ export default async function SettingsPage() {
     .from(schema.notificationDestination)
     .where(eq(schema.notificationDestination.userId, ownerId))
     .orderBy(desc(schema.notificationDestination.createdAt));
+  const clientDestinations = publicNotificationDestinations(destinations);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-12">
@@ -62,13 +72,18 @@ export default async function SettingsPage() {
         </h2>
         <div className="mt-3">
           <NotificationChannelsSettings
-            initialResendApiKey={row?.resendApiKey ?? null}
-            initialDestinations={destinations}
+            initialResendApiKey={resendApiKeyManaged ? null : row?.resendApiKey ?? null}
+            initialDestinations={clientDestinations}
+            resendApiKeyManaged={resendApiKeyManaged}
+            resendSendFromEmailManaged={resendSendFromEmailManaged}
           />
         </div>
       </section>
 
-      <ContextDevSettings initialContextDevApiKey={row?.contextDevApiKey ?? null} />
+      <ContextDevSettings
+        initialContextDevApiKey={contextDevApiKeyManaged ? null : row?.contextDevApiKey ?? null}
+        apiKeyManaged={contextDevApiKeyManaged}
+      />
 
       {teamManagement && <TeamSettings />}
     </div>

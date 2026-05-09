@@ -3,6 +3,8 @@
  * Docs: https://docs.context.dev/api-reference/web-scraping
  */
 
+import { effectiveContextDevApiKey } from "./server-managed-config";
+
 const API_BASE = "https://api.context.dev/v1";
 
 export class ContextDevError extends Error {
@@ -17,13 +19,12 @@ export class ContextDevError extends Error {
 }
 
 /**
- * @param override - Per-user key from Settings; when absent or empty, uses `CONTEXT_DEV_API_KEY`.
+ * @param override - Per-account key from Settings; ignored when `CONTEXT_DEV_API_KEY`
+ * is configured on the server.
  */
 function resolveApiKey(override?: string | null): string {
-  const trimmed = override?.trim();
-  if (trimmed) return trimmed;
-  const fromEnv = process.env.CONTEXT_DEV_API_KEY?.trim();
-  if (fromEnv) return fromEnv;
+  const key = effectiveContextDevApiKey(override);
+  if (key) return key;
   throw new ContextDevError(
     "context.dev API key is not set. Add it in Settings or set CONTEXT_DEV_API_KEY in the environment.",
     500,
@@ -111,7 +112,7 @@ export interface ExtractProductResult {
 
 export interface ExtractProductOptions {
   timeoutMS?: number;
-  /** Per-user key; falls back to CONTEXT_DEV_API_KEY. */
+  /** Per-account key; server-managed key takes precedence when configured. */
   apiKey?: string | null;
 }
 
@@ -151,7 +152,7 @@ export interface ScrapeMarkdownOptions {
   useMainContentOnly?: boolean;
   /** Cache duration in ms. 0 forces a fresh scrape. */
   maxAgeMs?: number;
-  /** Per-user key; falls back to CONTEXT_DEV_API_KEY. */
+  /** Per-account key; server-managed key takes precedence when configured. */
   apiKey?: string | null;
 }
 
@@ -178,7 +179,7 @@ export async function scrapeMarkdown(
 export interface ScrapeSitemapOptions {
   maxLinks?: number;
   urlRegex?: string;
-  /** Per-user key; falls back to CONTEXT_DEV_API_KEY. */
+  /** Per-account key; server-managed key takes precedence when configured. */
   apiKey?: string | null;
 }
 
@@ -217,7 +218,7 @@ export interface ScrapeScreenshotOptions {
   directUrl?: string;
   fullScreenshot?: boolean;
   prioritize?: "speed" | "quality";
-  /** Per-user key; falls back to CONTEXT_DEV_API_KEY. */
+  /** Per-account key; server-managed key takes precedence when configured. */
   apiKey?: string | null;
 }
 

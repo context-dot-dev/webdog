@@ -5,12 +5,13 @@ import { getApiUser, badRequest, parseJson } from "@/lib/api";
 import { ContextDevError, resolveAccountBrandLogoUrl } from "@/lib/context-client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
+import { isContextDevApiKeyManagedByEnv } from "@/lib/server-managed-config";
 
 const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("defer") }),
   z.object({
     action: z.literal("complete"),
-    apiKey: z.string().min(1, "Enter your API key"),
+    apiKey: z.string().optional(),
   }),
 ]);
 
@@ -50,7 +51,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const trimmedKey = parsed.data.apiKey.trim();
+  if (isContextDevApiKeyManagedByEnv()) {
+    await db
+      .update(schema.user)
+      .set({
+        contextIntroDismissedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(schema.user.id, sessionUser.id));
+
+    return NextResponse.json({ ok: true });
+  }
+
+  const trimmedKey = parsed.data.apiKey?.trim() ?? "";
   if (!trimmedKey) {
     return badRequest("Enter your Context.dev API key");
   }

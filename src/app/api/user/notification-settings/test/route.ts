@@ -11,15 +11,22 @@ import {
 } from "@/lib/notify-outbound-webhook";
 import { isValidSlackIncomingWebhookUrl, postSlackIncomingWebhook } from "@/lib/notify-slack";
 import { parseResendToEmails, sendResendEmail } from "@/lib/notify-resend";
+import { APP_NAME } from "@/lib/product-info";
+import {
+  effectiveResendApiKey,
+  effectiveResendSendFromEmail,
+  isResendApiKeyManagedByEnv,
+  isResendSendFromEmailManagedByEnv,
+} from "@/lib/server-managed-config";
 
 const bodySchema = z.object({
   destinationId: z.string().min(1),
 });
 
-const SLACK_TEST_MESSAGE = "Web Watchdog: Slack test — if you see this, the webhook works.";
-const EMAIL_TEST_SUBJECT = "Web Watchdog email test";
+const SLACK_TEST_MESSAGE = `${APP_NAME}: Slack test — if you see this, the webhook works.`;
+const EMAIL_TEST_SUBJECT = `${APP_NAME} email test`;
 const EMAIL_TEST_TEXT =
-  "This is a test message from Web Watchdog.\n\nIf you received this, your Resend integration is working.";
+  `This is a test message from ${APP_NAME}.\n\nIf you received this, your Resend integration is working.`;
 
 export async function POST(req: Request) {
   const { user, ownerId, response } = await requireApiUserWithWriteOwner();
@@ -72,11 +79,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const key = settings?.resendApiKey?.trim() ?? "";
-  const from = dest.resendFromEmail?.trim() ?? "";
+  const key = effectiveResendApiKey(settings?.resendApiKey) ?? "";
+  const from = effectiveResendSendFromEmail(dest.resendFromEmail) ?? "";
   const to = parseResendToEmails(dest.resendToEmails);
   if (!key || !from || to.length === 0) {
-    return badRequest("Set your Resend API key in Email settings and save from/recipients on this destination");
+    const managedDelivery = isResendApiKeyManagedByEnv() && isResendSendFromEmailManagedByEnv();
+    return badRequest(
+      managedDelivery
+        ? "Save at least one recipient on this email destination"
+        : "Set your Resend API key in Email settings and save from/recipients on this destination",
+    );
   }
 
   try {

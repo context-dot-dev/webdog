@@ -1,5 +1,5 @@
 {
-  "name": "web-watchdog",
+  "name": "webdog-ai",
   "version": "0.1.0",
   "license": "MIT",
   "private": true,
@@ -16,7 +16,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:reset": "rm -f data/web-watchdog.db data/web-watchdog.db-shm data/web-watchdog.db-wal && drizzle-kit push",
+    "db:reset": "rm -f data/webdog-ai.db data/webdog-ai.db-shm data/webdog-ai.db-wal && drizzle-kit push",
     "lint": "next lint"
   },
   "dependencies": {

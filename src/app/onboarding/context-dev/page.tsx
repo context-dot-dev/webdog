@@ -6,9 +6,14 @@ import { ContextDevOnboardingForm } from "@/components/context-dev-onboarding-fo
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
+import { isContextDevApiKeyManagedByEnv } from "@/lib/server-managed-config";
 
 export default async function ContextDevOnboardingPage() {
   const sessionUser = await requireUser();
+
+  if (isContextDevApiKeyManagedByEnv()) {
+    redirect("/dashboard");
+  }
 
   const [introRow] = await db
     .select({

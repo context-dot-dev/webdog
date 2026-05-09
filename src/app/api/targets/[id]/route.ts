@@ -7,6 +7,7 @@ import * as schema from "@/lib/db/schema";
 import { badRequest, notFound, parseJson, requireApiUserWithWriteOwner } from "@/lib/api";
 import { websiteOwnerAccessible } from "@/lib/account-access";
 import { computeNextCheckDueAfterSuccess } from "@/lib/scraper";
+import { monitorLimitError } from "@/lib/account-monitor-limits";
 
 async function loadForWrite(sessionUserId: string, ownerId: string, targetId: string) {
   const rows = await db
@@ -90,6 +91,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (parsed.data.linkScope !== undefined && owned.target.kind !== "SITEMAP_LINKS") {
     return badRequest("linkScope applies only to site links targets");
+  }
+
+  if (parsed.data.enabled === true && !owned.target.enabled) {
+    const limitError = await monitorLimitError(ownerId, { excludingTargetId: id });
+    if (limitError) return badRequest(limitError);
   }
 
   const updates: {

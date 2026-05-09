@@ -2,6 +2,8 @@
  * Shared structure for "new alerts" notifications across Slack and email.
  */
 
+import { APP_NAME, NEW_ALERTS_EVENT_TYPE } from "./product-info";
+
 export type NewAlertsSite = { id: string; name: string; domain: string };
 
 export type NewAlertsAlert = {
@@ -24,7 +26,7 @@ export type NewAlertsPayload = {
 
 /** JSON body POSTed to the user-configured alert webhook URL. */
 export type NewAlertsWebhookBody = {
-  type: "web_watchdog.new_alerts";
+  type: typeof NEW_ALERTS_EVENT_TYPE;
   version: 1;
   kind: "new_alerts";
   appBaseUrl: string;
@@ -177,7 +179,7 @@ export function buildNewAlertsSlackBlocks(payload: NewAlertsPayload): SlackBlock
       type: "header",
       text: {
         type: "plain_text",
-        text: `Web Watchdog: ${n} new change${n === 1 ? "" : "s"}`,
+        text: `${APP_NAME}: ${n} new change${n === 1 ? "" : "s"}`,
         emoji: true,
       },
     },
@@ -228,7 +230,7 @@ export function buildNewAlertsSlackBlocks(payload: NewAlertsPayload): SlackBlock
   blocks.push({ type: "divider" });
   blocks.push({
     type: "section",
-    text: { type: "mrkdwn", text: `<${openUrl}|Open in Web Watchdog>` },
+    text: { type: "mrkdwn", text: `<${openUrl}|Open in ${APP_NAME}>` },
   });
 
   return blocks;
@@ -264,13 +266,13 @@ export function formatNewAlertsSlackText(payload: NewAlertsPayload): string {
     .join("\n\n");
   const more = n > maxAlerts ? `\n… and ${n - maxAlerts} more` : "";
 
-  return `Web Watchdog: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}`;
+  return `${APP_NAME}: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}`;
 }
 
 export function buildNewAlertsWebhookBody(payload: NewAlertsPayload): NewAlertsWebhookBody {
   const { appBaseUrl, alerts } = payload;
   return {
-    type: "web_watchdog.new_alerts",
+    type: NEW_ALERTS_EVENT_TYPE,
     version: 1,
     kind: payload.kind,
     appBaseUrl,
@@ -284,7 +286,7 @@ export function buildNewAlertsWebhookBody(payload: NewAlertsPayload): NewAlertsW
 }
 
 export function formatNewAlertsEmailSubject(payload: NewAlertsPayload): string {
-  return `Web Watchdog: ${payload.alerts.length} new change(s) for ${payload.site.name}`;
+  return `${APP_NAME}: ${payload.alerts.length} new change(s) for ${payload.site.name}`;
 }
 
 /** Plain text email body with inline +/- diff preview. */
@@ -327,7 +329,7 @@ export function formatNewAlertsEmailText(payload: NewAlertsPayload): string {
     .join("\n\n");
   const more = n > maxAlerts ? `\n… and ${n - maxAlerts} more` : "";
 
-  return `Web Watchdog: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}`;
+  return `${APP_NAME}: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}`;
 }
 
 /** Backwards-compatible helper matching the previous notify-slack signature. */

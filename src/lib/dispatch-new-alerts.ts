@@ -10,6 +10,11 @@ import { isValidAlertWebhookUrl, postAlertWebhookJson } from "./notify-outbound-
 import { isValidSlackIncomingWebhookUrl, postSlackIncomingWebhook } from "./notify-slack";
 import { parseResendToEmails, sendResendEmail } from "./notify-resend";
 import type { NotificationChannel } from "./db/schema";
+import {
+  appendAlertPostfix,
+  effectiveResendApiKey,
+  effectiveResendSendFromEmail,
+} from "./server-managed-config";
 
 export type DestinationDispatchRow = {
   channel: NotificationChannel;
@@ -39,8 +44,8 @@ export async function dispatchNewAlertsForDestinations(
         }
       }
     } else if (d.channel === "EMAIL") {
-      const key = accountResendApiKey?.trim() ?? "";
-      const from = d.resendFromEmail?.trim() ?? "";
+      const key = effectiveResendApiKey(accountResendApiKey) ?? "";
+      const from = effectiveResendSendFromEmail(d.resendFromEmail) ?? "";
       const to = parseResendToEmails(d.resendToEmails ?? null);
       if (key && from && to.length > 0) {
         try {
@@ -48,7 +53,7 @@ export async function dispatchNewAlertsForDestinations(
             apiKey: key,
             from,
             to,
-            subject: formatNewAlertsEmailSubject(payload),
+            subject: appendAlertPostfix(formatNewAlertsEmailSubject(payload)),
             text: formatNewAlertsEmailText(payload),
           });
         } catch (err) {

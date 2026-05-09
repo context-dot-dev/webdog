@@ -1,4 +1,4 @@
-# Web Watchdog
+# webdog.ai
 
 Open-source website change monitoring: scrape pages, diff over time, and get notified when something moves, disappears, or edits.
 
@@ -13,7 +13,7 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
 
    ```bash
    git clone <your-repo-url>
-   cd website-watchdog
+   cd webdog-ai
    npm install
    ```
 
@@ -59,6 +59,8 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
 ## Production notes
 
 - On **Railway**, omit **`BETTER_AUTH_URL`** to use **`https://${RAILWAY_PUBLIC_DOMAIN}`** when public networking is enabled; override with **`BETTER_AUTH_URL`** or **`NEXT_PUBLIC_APP_URL`** if needed (see **Deploy on Railway**). Elsewhere set **`BETTER_AUTH_URL`** to your public `https://…` URL. Keep **`BETTER_AUTH_SECRET`** private.
+- Server-managed **`CONTEXT_DEV_API_KEY`**, **`RESEND_API_KEY`**, and **`RESEND_SEND_FROM_EMAIL`** are used only on the server. When provided, the dashboard hides those account-level setup fields and does not return the values to the browser.
+- **`MAX_ALERTS`** can cap active monitors per account, and **`POSTFIX_TO_ALERTS`** can append deployment-specific text to new alerts.
 - Use `npm run build` then `npm run start` for the Next.js app, and run the **worker** separately (e.g. as another process or service) if you need scheduled checks.
 
 ### Better Auth `disableOriginCheck` (avoid if you can)
@@ -94,7 +96,10 @@ You still **configure** the deployment so one of these resolves to a real HTTPS 
 **You only need to provide a [context.dev](https://context.dev) API key.** Everything else has Railway-aware defaults:
 
 - **`CONTEXT_DEV_API_KEY`** — required for scrapes (same as local dev).
-- **`DATABASE_URL`** — optional; defaults to `/data/web-watchdog.db` on Railway when unset.
+- **`RESEND_API_KEY`** and **`RESEND_SEND_FROM_EMAIL`** — optional server-managed email delivery for all accounts.
+- **`MAX_ALERTS`** — optional maximum active monitors per account.
+- **`POSTFIX_TO_ALERTS`** — optional text appended to new alert titles and outbound email subjects.
+- **`DATABASE_URL`** — optional; defaults to `/data/webdog-ai.db` on Railway when unset.
 - **`BETTER_AUTH_URL`** — optional; if unset, the app uses **`https://${RAILWAY_PUBLIC_DOMAIN}`** when Railway provides it (see **Public URL / Better Auth** above). Set explicitly for an override or when the system domain variable is unreliable.
 - **`NEXT_PUBLIC_APP_URL`** — optional Railway fallback (`https://…`) after **`RAILWAY_PUBLIC_DOMAIN`**; useful when the system variable is empty or must match Next’s public bundle.
 - **`BETTER_AUTH_ALLOWED_HOSTS`** — optional; comma-separated **host patterns** (wildcards allowed, e.g. `*.up.railway.app`) so sign-in works from **multiple or changing** public URLs without redeploying each time.
@@ -106,7 +111,7 @@ Steps:
 1. Create a Railway project from this repo (or deploy a template based on it).
 2. Attach a **volume** at **`/data`** on the service.
 3. Turn on **public networking** and generate a Railway domain (or configure a custom domain).
-4. Set **`CONTEXT_DEV_API_KEY`** (and optional overrides above), then deploy.
+4. Set **`CONTEXT_DEV_API_KEY`** (and any optional managed settings above), then deploy.
 
 Start runs `npm run db:migrate` (SQLite needs the mounted `/data` volume in the main app container), then the worker in the background and `next start` in the foreground. Health checks use `GET /api/health`.
 
@@ -116,13 +121,17 @@ Start runs `npm run db:migrate` (SQLite needs the mounted `/data` volume in the 
 
 | Variable | Example / notes |
 |----------|-----------------|
-| `DATABASE_URL` | `/data/web-watchdog.db` if not using the default above |
+| `DATABASE_URL` | `/data/webdog-ai.db` if not using the default above |
 | `BETTER_AUTH_SECRET` | Optional on Railway (volume file); required on Vercel / Netlify / Cloudflare |
 | *(Railway system)* | **`RAILWAY_PUBLIC_DOMAIN`** — used automatically as `https://…` when **`BETTER_AUTH_URL`** is unset |
 | `NEXT_PUBLIC_APP_URL` | Optional; `https://…` fallback on Railway when the system public domain is missing / you want an explicit public URL in the client |
 | `BETTER_AUTH_URL` | Optional override; also the **fallback** when using **`BETTER_AUTH_ALLOWED_HOSTS`** |
 | `BETTER_AUTH_ALLOWED_HOSTS` | Optional; e.g. `*.up.railway.app,my.com` — per-request host allowlist (see README above) |
 | `CONTEXT_DEV_API_KEY` | Bearer token for context.dev |
+| `RESEND_API_KEY` | Optional server-managed Resend API key for email notifications |
+| `RESEND_SEND_FROM_EMAIL` | Optional server-managed sender address for email notifications |
+| `POSTFIX_TO_ALERTS` | Optional text appended to new alert titles and outbound email subjects |
+| `MAX_ALERTS` | Optional active monitor limit per account |
 
 If `better-sqlite3` fails to compile on the builder, add a Dockerfile with build tools and set Railway’s builder to Dockerfile (see [Railway builds](https://docs.railway.com/builds)).
 
@@ -130,7 +139,7 @@ If `better-sqlite3` fails to compile on the builder, add a Dockerfile with build
 
 Follow **[`railway/template-publish.md`](railway/template-publish.md)** for icons, naming, volume **`/data`**, health path **`/api/health`**, variable descriptions, and marketplace overview text aligned with Railway’s [template best practices](https://docs.railway.com/templates/best-practices).
 
-In the [template composer](https://docs.railway.com/templates/create): add this repo as the service source, attach a volume at **`/data`**, enable HTTP public networking, and add a **required** variable **`CONTEXT_DEV_API_KEY`** for deployers. Optional: add **`BETTER_AUTH_SECRET=${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=`** (see [template variable functions](https://docs.railway.com/templates/create#template-variable-functions)) instead of relying on the auto-generated volume secret. Copy the **template URL** Railway gives you into your README or site for one-click deploys.
+In the [template composer](https://docs.railway.com/templates/create): add this repo as the service source, attach a volume at **`/data`**, enable HTTP public networking, and add a **required** variable **`CONTEXT_DEV_API_KEY`** for deployers. Optional: expose **`RESEND_API_KEY`**, **`RESEND_SEND_FROM_EMAIL`**, **`MAX_ALERTS`**, and **`POSTFIX_TO_ALERTS`** for managed deployments, and add **`BETTER_AUTH_SECRET=${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=`** (see [template variable functions](https://docs.railway.com/templates/create#template-variable-functions)) instead of relying on the auto-generated volume secret. Copy the **template URL** Railway gives you into your README or site for one-click deploys.
 
 ## Team invites (shared accounts)
 

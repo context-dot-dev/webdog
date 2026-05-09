@@ -72,11 +72,11 @@ export const userNotificationSettings = sqliteTable("userNotificationSettings", 
   userId: text("userId")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
-  /** Overrides process.env.CONTEXT_DEV_API_KEY for this user’s scrapes and brand fetch. */
+  /** Per-account key used only when CONTEXT_DEV_API_KEY is not configured on the server. */
   contextDevApiKey: text("contextDevApiKey"),
   /** Hotlinked brand icon URL from Context.dev (e.g. dashboard avatar). */
   accountBrandLogoUrl: text("accountBrandLogoUrl"),
-  /** Shared Resend API key for all EMAIL destinations. */
+  /** Per-account Resend API key used only when RESEND_API_KEY is not configured on the server. */
   resendApiKey: text("resendApiKey"),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
     .notNull()

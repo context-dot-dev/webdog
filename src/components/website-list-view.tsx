@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AddWebsiteDialog } from "@/components/add-website-dialog";
 import { RelativeTime } from "@/components/relative-time";
+import { APP_NAME } from "@/lib/product-info";
 
 type Website = {
   id: string;
@@ -23,7 +24,7 @@ type Website = {
 
 type ViewMode = "grid" | "list";
 
-const VIEW_PREF_KEY = "website-watchdog:dashboard-view";
+const VIEW_PREF_KEY = `${APP_NAME}:dashboard-view`;
 
 function WebsiteLogoAvatar({
   logoUrl,

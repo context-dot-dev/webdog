@@ -2,6 +2,8 @@
  * Generic outbound webhooks: POST JSON to a user-configured URL (https or http).
  */
 
+import { TEST_EVENT_TYPE, WEBHOOK_USER_AGENT } from "./product-info";
+
 const FETCH_TIMEOUT_MS = 15_000;
 
 export function isValidAlertWebhookUrl(urlStr: string): boolean {
@@ -22,7 +24,7 @@ export async function postAlertWebhookJson(url: string, body: unknown): Promise<
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "User-Agent": "WebWatchdog/1.0",
+      "User-Agent": WEBHOOK_USER_AGENT,
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -35,7 +37,7 @@ export async function postAlertWebhookJson(url: string, body: unknown): Promise<
 }
 
 export const ALERT_WEBHOOK_TEST_BODY = {
-  type: "web_watchdog.test",
+  type: TEST_EVENT_TYPE,
   version: 1 as const,
   message: "If you receive this JSON payload, your Webhook integration is working.",
 };

@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { caughtUnknownMessage } from "@/lib/caught-unknown-message";
+import { APP_NAME } from "@/lib/product-info";
 
 export function ContextDevOnboardingForm({
   userName,
@@ -76,7 +77,7 @@ export function ContextDevOnboardingForm({
       <div className={className}>
         <p className="text-sm text-neutral-600">
           Hey {userName} —{" "}
-          <span className="font-medium text-neutral-900">Web Watchdog</span> is powered by the Context.dev APIs.
+          <span className="font-medium text-neutral-900">{APP_NAME}</span> is powered by the Context.dev APIs.
           Visit{" "}
           <a
             href="https://context.dev/signup"
@@ -148,7 +149,7 @@ export function ContextDevOnboardingForm({
           />
           <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white p-6 shadow-card ring-1 ring-neutral-950/10">
             <p className="text-sm leading-relaxed text-neutral-900">
-              A free context.dev API key is needed for Web Watchdog to work.
+              A free context.dev API key is needed for {APP_NAME} to work.
             </p>
             {error && (
               <p className="mt-4 text-sm text-brand-700" role="alert">

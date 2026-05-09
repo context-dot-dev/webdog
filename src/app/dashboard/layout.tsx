@@ -5,7 +5,9 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { websiteOwnerAccessible } from "@/lib/account-access";
 import { getEffectiveAccountOwnerForWrites, loadAccountChoices } from "@/lib/effective-account";
+import { APP_NAME } from "@/lib/product-info";
 import { requireUser } from "@/lib/session";
+import { isContextDevApiKeyManagedByEnv } from "@/lib/server-managed-config";
 import { AccountSwitcher } from "@/components/account-switcher";
 import { MobileNav } from "@/components/mobile-nav";
 import { TopNav } from "@/components/top-nav";
@@ -34,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .where(eq(schema.userNotificationSettings.userId, logoOwnerId))
     .limit(1);
 
-  if (!profile?.dismissed) {
+  if (!profile?.dismissed && !isContextDevApiKeyManagedByEnv()) {
     redirect("/onboarding/context-dev");
   }
 
@@ -57,14 +59,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6 lg:px-8">
           <Link
             href="/dashboard"
-            aria-label="Web Watchdog home"
+            aria-label={`${APP_NAME} home`}
             className="flex shrink-0 items-center gap-2.5"
           >
             <span className="grid size-9 place-items-center rounded-2xl bg-neutral-900 text-xl text-cream-100">
               🐶
             </span>
             <span className="hidden font-semibold tracking-tight text-neutral-900 sm:inline">
-              Web Watchdog
+              {APP_NAME}
             </span>
           </Link>
           <span aria-hidden className="hidden h-5 w-px bg-neutral-900/10 lg:inline-block" />

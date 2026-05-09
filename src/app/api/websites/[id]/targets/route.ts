@@ -6,6 +6,7 @@ import * as schema from "@/lib/db/schema";
 import { notFound, parseJson, badRequest, requireApiUserWithWriteOwner } from "@/lib/api";
 import { websiteOwnerAccessible } from "@/lib/account-access";
 import { newId } from "@/lib/ids";
+import { monitorLimitError } from "@/lib/account-monitor-limits";
 
 const createSchema = z.discriminatedUnion("category", [
   z.object({
@@ -71,6 +72,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const parsed = await parseJson(req, createSchema);
   if (parsed.response) return parsed.response;
+
+  const limitError = await monitorLimitError(ownerId);
+  if (limitError) return badRequest(limitError);
 
   const wantOutbound = parsed.data.externalNotify !== false;
   const providedDest = parsed.data.notificationDestinationId?.trim();

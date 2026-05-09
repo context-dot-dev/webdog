@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 
 export function ContextDevSettings({
   initialContextDevApiKey,
+  apiKeyManaged,
 }: {
   initialContextDevApiKey: string | null;
+  apiKeyManaged: boolean;
 }) {
   const router = useRouter();
   const id = useId();
@@ -45,57 +47,57 @@ export function ContextDevSettings({
     <div className="mt-6">
       <h2 className="text-sm font-medium text-neutral-900">Context.dev</h2>
       <p className="mt-1 text-sm text-neutral-600">
-        Used to scrape sitemaps, page content, and brand data.{" "}
-        <a
-          href="https://context.dev"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-brand-700 underline decoration-brand-500/30 underline-offset-2 hover:decoration-brand-500"
-        >
-          Get an API key
-        </a>{" "}
-        — or set <code className="kbd">CONTEXT_DEV_API_KEY</code> on the server to apply to all users.
+        Used to scrape sitemaps, page content, and brand data.
       </p>
       <div className="mt-3 overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-950/5">
         <div className="p-5">
-          <div className="space-y-2">
-            <label htmlFor={id} className="text-sm font-medium text-neutral-900">
-              API key
-            </label>
-            <p className="text-xs text-neutral-500">Bearer token. Stored in your database (self‑hosted only).</p>
-            <div className="flex min-w-0 items-stretch gap-2">
-              <input
-                id={id}
-                name="contextDevApiKey"
-                type="password"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                autoComplete="off"
-                placeholder="brand_…"
-                className="input box-border h-9 min-h-0 min-w-0 flex-1 !py-0 font-mono text-xs leading-9"
-              />
-              <div className="flex h-9 min-h-9 shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void onSave()}
-                  disabled={saving}
-                  className="btn-primary box-border h-9 min-h-9 !max-h-9 !min-h-9 !px-3 !py-0 whitespace-nowrap"
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-                {savedFlash && (
-                  <span className="text-xs text-brand-700" role="status">
-                    Saved
-                  </span>
-                )}
-              </div>
-            </div>
-            {error && (
-              <p className="text-xs text-red-600" role="alert">
-                {error}
+          {apiKeyManaged ? (
+            <div>
+              <p className="text-sm font-medium text-neutral-900">Configured by this deployment</p>
+              <p className="mt-1 text-xs text-neutral-500">
+                Context.dev requests use a server-managed key. Account API keys are not accepted here.
               </p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label htmlFor={id} className="text-sm font-medium text-neutral-900">
+                API key
+              </label>
+              <p className="text-xs text-neutral-500">Bearer token. Stored in your account settings.</p>
+              <div className="flex min-w-0 items-stretch gap-2">
+                <input
+                  id={id}
+                  name="contextDevApiKey"
+                  type="password"
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  autoComplete="off"
+                  placeholder="brand_…"
+                  className="input box-border h-9 min-h-0 min-w-0 flex-1 !py-0 font-mono text-xs leading-9"
+                />
+                <div className="flex h-9 min-h-9 shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void onSave()}
+                    disabled={saving}
+                    className="btn-primary box-border h-9 min-h-9 !max-h-9 !min-h-9 !px-3 !py-0 whitespace-nowrap"
+                  >
+                    {saving ? "Saving…" : "Save"}
+                  </button>
+                  {savedFlash && (
+                    <span className="text-xs text-brand-700" role="status">
+                      Saved
+                    </span>
+                  )}
+                </div>
+              </div>
+              {error && (
+                <p className="text-xs text-red-600" role="alert">
+                  {error}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

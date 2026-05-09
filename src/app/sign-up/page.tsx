@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { previewInviteFromRawToken } from "@/lib/account-invite-preview";
 import { signUpInviteSubtitle } from "@/lib/auth-invite-copy";
+import { APP_NAME } from "@/lib/product-info";
 import { getCurrentSession } from "@/lib/session";
 import { SignUpForm } from "./form";
 
@@ -24,7 +25,7 @@ export default async function SignUpPage({
           <span className="grid size-9 place-items-center rounded-2xl bg-neutral-900 text-xl text-cream-100">
             🐶
           </span>
-          <span className="text-lg font-semibold">Web Watchdog</span>
+          <span className="text-lg font-semibold">{APP_NAME}</span>
         </Link>
         <div className="mx-auto w-full max-w-xs">
           <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Create your account</h1>

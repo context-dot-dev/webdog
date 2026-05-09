@@ -1,12 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_DATABASE_PATH, RAILWAY_DATABASE_PATH } from "../product-info";
 
 export function resolveDatabaseUrl(): string {
   const fromEnv = process.env.DATABASE_URL?.trim();
   if (fromEnv) return fromEnv;
-  if (process.env.RAILWAY_PROJECT_ID) return "/data/web-watchdog.db";
-  return "./data/web-watchdog.db";
+  if (process.env.RAILWAY_PROJECT_ID) return RAILWAY_DATABASE_PATH;
+  return DEFAULT_DATABASE_PATH;
 }
 
 /** Filesystem path to the SQLite file (handles `file:` URLs). */

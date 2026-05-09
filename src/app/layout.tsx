@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { APP_NAME } from "@/lib/product-info";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Web Watchdog — open-source website change monitoring",
+  title: `${APP_NAME} — open-source website change monitoring`,
   description:
     "Watch websites for new links, removed links, or content changes. Open-source, self-hostable, SQLite-backed.",
 };

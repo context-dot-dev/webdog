@@ -3,7 +3,8 @@
 // on a cron schedule. Start alongside `next dev` in a second terminal:
 //   npm run worker            # long-running
 //   npm run worker:once       # single pass, then exit
-// Env: SCRAPE_CRON (default every 15 min), CONTEXT_DEV_API_KEY, DATABASE_URL.
+// Env: SCRAPE_CRON (default every 15 min), CONTEXT_DEV_API_KEY, RESEND_API_KEY,
+// RESEND_SEND_FROM_EMAIL, POSTFIX_TO_ALERTS, MAX_ALERTS, DATABASE_URL.
 
 import "dotenv/config";
 import cron from "node-cron";

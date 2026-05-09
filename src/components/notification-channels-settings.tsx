@@ -7,6 +7,7 @@ import type { NotificationDestination } from "@/lib/db/schema";
 import { isValidAlertWebhookUrl } from "@/lib/notify-outbound-webhook";
 import { parseResendToEmails } from "@/lib/notify-resend";
 import { isValidSlackIncomingWebhookUrl } from "@/lib/notify-slack";
+import { NEW_ALERTS_EVENT_TYPE, TEST_EVENT_TYPE } from "@/lib/product-info";
 
 /** Envelope icon — Font Awesome Free v7.2.0 (https://fontawesome.com/license/free). */
 function EmailEnvelopeIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -74,7 +75,7 @@ function destinationSecretUrl(d: NotificationDestination): string | null {
   return null;
 }
 
-function destinationSummary(d: NotificationDestination): string {
+function destinationSummary(d: NotificationDestination, resendSendFromEmailManaged: boolean): string {
   if (d.channel === "SLACK") {
     const u = d.slackWebhookUrl?.trim() ?? "";
     return u ? trunc(u, 48) : "—";
@@ -82,7 +83,8 @@ function destinationSummary(d: NotificationDestination): string {
   if (d.channel === "EMAIL") {
     const from = d.resendFromEmail?.trim() ?? "";
     const to = parseResendToEmails(d.resendToEmails ?? null);
-    return from && to.length ? `${from} → ${to.length} recipient(s)` : "—";
+    const fromLabel = resendSendFromEmailManaged ? "Managed sender" : from;
+    return fromLabel && to.length ? `${fromLabel} → ${to.length} recipient(s)` : "—";
   }
   const u = d.alertWebhookUrl?.trim() ?? "";
   return u ? trunc(u, 48) : "—";
@@ -95,7 +97,12 @@ function RedactedWebhookSummary({ url }: { url: string }) {
   );
 }
 
-function canTestDestination(d: NotificationDestination, accountResendKey: string): boolean {
+function canTestDestination(
+  d: NotificationDestination,
+  accountResendKey: string,
+  resendApiKeyManaged: boolean,
+  resendSendFromEmailManaged: boolean,
+): boolean {
   if (d.channel === "SLACK") {
     const u = d.slackWebhookUrl?.trim() ?? "";
     return u !== "" && isValidSlackIncomingWebhookUrl(u);
@@ -104,10 +111,10 @@ function canTestDestination(d: NotificationDestination, accountResendKey: string
     const u = d.alertWebhookUrl?.trim() ?? "";
     return u !== "" && isValidAlertWebhookUrl(u);
   }
-  const key = accountResendKey.trim();
-  const from = d.resendFromEmail?.trim() ?? "";
+  const keyOk = resendApiKeyManaged || accountResendKey.trim() !== "";
+  const fromOk = resendSendFromEmailManaged || (d.resendFromEmail?.trim() ?? "") !== "";
   const to = parseResendToEmails(d.resendToEmails ?? null);
-  return Boolean(key && from && to.length > 0);
+  return Boolean(keyOk && fromOk && to.length > 0);
 }
 
 type Channel = NotificationDestination["channel"];
@@ -128,6 +135,8 @@ function NotificationChannelRow({
   testFlashId,
   formOpen,
   editingId,
+  resendApiKeyManaged,
+  resendSendFromEmailManaged,
 }: {
   title: string;
   subtitle: string;
@@ -145,6 +154,8 @@ function NotificationChannelRow({
   testFlashId: string | null;
   formOpen: boolean;
   editingId: string | null;
+  resendApiKeyManaged: boolean;
+  resendSendFromEmailManaged: boolean;
 }) {
   const visibleList = list.filter((d) => !(formOpen && editingId === d.id));
   const hasForm = Boolean(formSlot);
@@ -200,7 +211,9 @@ function NotificationChannelRow({
                         {secretUrl ? (
                           <RedactedWebhookSummary url={secretUrl} />
                         ) : (
-                          <div className="truncate font-mono text-xs text-neutral-600">{destinationSummary(d)}</div>
+                          <div className="truncate font-mono text-xs text-neutral-600">
+                            {destinationSummary(d, resendSendFromEmailManaged)}
+                          </div>
                         )}
                         {testFlashId === d.id ? (
                           <p className="mt-0.5 text-xs text-brand-700">Test sent</p>
@@ -210,10 +223,23 @@ function NotificationChannelRow({
                         <button
                           type="button"
                           onClick={() => onTest(d.id)}
-                          disabled={testBusyId === d.id || !canTestDestination(d, resendApiKey)}
+                          disabled={
+                            testBusyId === d.id ||
+                            !canTestDestination(
+                              d,
+                              resendApiKey,
+                              resendApiKeyManaged,
+                              resendSendFromEmailManaged,
+                            )
+                          }
                           title={
-                            !canTestDestination(d, resendApiKey)
-                              ? "Complete this destination (and save the Resend key for email)"
+                            !canTestDestination(
+                              d,
+                              resendApiKey,
+                              resendApiKeyManaged,
+                              resendSendFromEmailManaged,
+                            )
+                              ? "Complete this destination before testing"
                               : undefined
                           }
                           className="btn-secondary box-border h-8 !px-2 !py-0 text-xs"
@@ -252,12 +278,18 @@ function NotificationChannelRow({
 export function NotificationChannelsSettings({
   initialResendApiKey,
   initialDestinations,
+  resendApiKeyManaged,
+  resendSendFromEmailManaged,
 }: {
   initialResendApiKey: string | null;
   initialDestinations: NotificationDestination[];
+  resendApiKeyManaged: boolean;
+  resendSendFromEmailManaged: boolean;
 }) {
   const [destinations, setDestinations] = useState<NotificationDestination[]>(() => initialDestinations);
-  const [resendApiKey, setResendApiKey] = useState(() => initialResendApiKey ?? "");
+  const [resendApiKey, setResendApiKey] = useState(() =>
+    resendApiKeyManaged ? "" : initialResendApiKey ?? "",
+  );
 
   const [addingChannel, setAddingChannel] = useState<Channel | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -301,7 +333,7 @@ export function NotificationChannelsSettings({
     setFormError(null);
     setFormName(d.name);
     setFormSlackUrl(d.slackWebhookUrl ?? "");
-    setFormFrom(d.resendFromEmail ?? "");
+    setFormFrom(resendSendFromEmailManaged ? "" : d.resendFromEmail ?? "");
     setFormTo(d.resendToEmails ?? "");
     setFormHookUrl(d.alertWebhookUrl ?? "");
     setRevealFormSlackUrl(false);
@@ -320,7 +352,7 @@ export function NotificationChannelsSettings({
     setFormError(null);
     setFormSaving(true);
     try {
-      if (channel === "EMAIL") {
+      if (channel === "EMAIL" && !resendApiKeyManaged) {
         const keyRes = await fetch("/api/user/notification-settings", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -343,7 +375,7 @@ export function NotificationChannelsSettings({
         const body: Record<string, unknown> = { name: formName.trim() };
         if (channel === "SLACK") body.slackWebhookUrl = formSlackUrl.trim() || null;
         if (channel === "EMAIL") {
-          body.resendFromEmail = formFrom.trim() || null;
+          if (!resendSendFromEmailManaged) body.resendFromEmail = formFrom.trim() || null;
           body.resendToEmails = formTo.trim() || null;
         }
         if (channel === "WEBHOOK") body.alertWebhookUrl = formHookUrl.trim() || null;
@@ -375,7 +407,7 @@ export function NotificationChannelsSettings({
             ? {
                 channel: "EMAIL" as const,
                 name: formName.trim(),
-                resendFromEmail: formFrom.trim(),
+                ...(resendSendFromEmailManaged ? {} : { resendFromEmail: formFrom.trim() }),
                 resendToEmails: formTo.trim(),
               }
             : {
@@ -484,37 +516,49 @@ export function NotificationChannelsSettings({
         ) : null}
         {channel === "EMAIL" ? (
           <>
-            <div className="space-y-1.5">
-              <label htmlFor={`${emailFormId}-resend`} className="block text-xs font-medium text-neutral-700">
-                Resend API key
-              </label>
-              <p className="text-xs text-neutral-500">
-                Saved to your account and autofilled here. Clearing it removes the stored key when you save.
-              </p>
-              <input
-                id={`${emailFormId}-resend`}
-                type="password"
-                value={resendApiKey}
-                onChange={(e) => setResendApiKey(e.target.value)}
-                autoComplete="off"
-                className="input box-border h-9 w-full font-mono text-xs"
-                placeholder="re_…"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor={`${emailFormId}-from`} className="block text-xs font-medium text-neutral-700">
-                Verified from email
-              </label>
-              <input
-                id={`${emailFormId}-from`}
-                value={formFrom}
-                onChange={(e) => setFormFrom(e.target.value)}
-                type="email"
-                className="input box-border h-9 w-full text-sm"
-                placeholder="alerts@yourdomain.com"
-                autoComplete="email"
-              />
-            </div>
+            {resendApiKeyManaged ? (
+              <div className="rounded-lg bg-neutral-50/80 px-3 py-2 ring-1 ring-neutral-950/5">
+                <p className="text-xs font-medium text-neutral-800">Email delivery is configured by this deployment.</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <label htmlFor={`${emailFormId}-resend`} className="block text-xs font-medium text-neutral-700">
+                  Resend API key
+                </label>
+                <p className="text-xs text-neutral-500">
+                  Saved to your account and autofilled here. Clearing it removes the stored key when you save.
+                </p>
+                <input
+                  id={`${emailFormId}-resend`}
+                  type="password"
+                  value={resendApiKey}
+                  onChange={(e) => setResendApiKey(e.target.value)}
+                  autoComplete="off"
+                  className="input box-border h-9 w-full font-mono text-xs"
+                  placeholder="re_…"
+                />
+              </div>
+            )}
+            {resendSendFromEmailManaged ? (
+              <div className="rounded-lg bg-neutral-50/80 px-3 py-2 ring-1 ring-neutral-950/5">
+                <p className="text-xs font-medium text-neutral-800">Sender address is configured by this deployment.</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <label htmlFor={`${emailFormId}-from`} className="block text-xs font-medium text-neutral-700">
+                  Verified from email
+                </label>
+                <input
+                  id={`${emailFormId}-from`}
+                  value={formFrom}
+                  onChange={(e) => setFormFrom(e.target.value)}
+                  type="email"
+                  className="input box-border h-9 w-full text-sm"
+                  placeholder="alerts@yourdomain.com"
+                  autoComplete="email"
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-neutral-700">Send to email(s)</label>
               <textarea
@@ -600,7 +644,7 @@ export function NotificationChannelsSettings({
   ];
 
   const webhookPayloadHintTitle =
-    "Payloads use type: web_watchdog.new_alerts (and web_watchdog.test for tests).";
+    `Payloads use type: ${NEW_ALERTS_EVENT_TYPE} (and ${TEST_EVENT_TYPE} for tests).`;
 
   return (
     <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-950/5">
@@ -628,6 +672,8 @@ export function NotificationChannelsSettings({
             testFlashId={testFlashId}
             formOpen={Boolean(formOpen)}
             editingId={editingId}
+            resendApiKeyManaged={resendApiKeyManaged}
+            resendSendFromEmailManaged={resendSendFromEmailManaged}
           />
         );
       })}

@@ -7,6 +7,8 @@ import { badRequest, notFound, parseJson, requireApiUserWithWriteOwner } from "@
 import { isValidAlertWebhookUrl } from "@/lib/notify-outbound-webhook";
 import { normalizeResendToEmailsForStorage } from "@/lib/notify-resend";
 import { isValidSlackIncomingWebhookUrl } from "@/lib/notify-slack";
+import { isResendSendFromEmailManagedByEnv } from "@/lib/server-managed-config";
+import { publicNotificationDestination } from "@/lib/notification-destination-public";
 import {
   parseWebsiteNotificationDestinationIds,
   stringifyWebsiteNotificationDestinationIds,
@@ -93,7 +95,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (body.slackWebhookUrl !== undefined || body.alertWebhookUrl !== undefined) {
       return badRequest("Only name, resendFromEmail, and resendToEmails allowed for email destinations");
     }
-    if (body.resendFromEmail !== undefined) {
+    if (isResendSendFromEmailManagedByEnv()) {
+      if (body.resendFromEmail !== undefined) {
+        return badRequest("Resend sender is managed by this deployment");
+      }
+    } else if (body.resendFromEmail !== undefined) {
       if (body.resendFromEmail === null) {
         resendFromEmail = null;
       } else {
@@ -149,7 +155,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .where(eq(schema.notificationDestination.id, id))
     .limit(1);
 
-  return NextResponse.json({ destination: row });
+  return NextResponse.json({ destination: row ? publicNotificationDestination(row) : row });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

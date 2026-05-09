@@ -9,6 +9,11 @@ import { newId } from "@/lib/ids";
 import { isValidAlertWebhookUrl } from "@/lib/notify-outbound-webhook";
 import { normalizeResendToEmailsForStorage } from "@/lib/notify-resend";
 import { isValidSlackIncomingWebhookUrl } from "@/lib/notify-slack";
+import { isResendSendFromEmailManagedByEnv } from "@/lib/server-managed-config";
+import {
+  publicNotificationDestination,
+  publicNotificationDestinations,
+} from "@/lib/notification-destination-public";
 
 const createSchema = z.discriminatedUnion("channel", [
   z.object({
@@ -19,7 +24,7 @@ const createSchema = z.discriminatedUnion("channel", [
   z.object({
     channel: z.literal("EMAIL"),
     name: z.string().min(1).max(120),
-    resendFromEmail: z.string(),
+    resendFromEmail: z.string().optional(),
     resendToEmails: z.string(),
   }),
   z.object({
@@ -39,7 +44,7 @@ export async function GET() {
     .where(accountOwnerColumnAccessible(schema.notificationDestination.userId, user.id))
     .orderBy(desc(schema.notificationDestination.createdAt));
 
-  return NextResponse.json({ destinations: rows });
+  return NextResponse.json({ destinations: publicNotificationDestinations(rows) });
 }
 
 export async function POST(req: Request) {
@@ -71,9 +76,16 @@ export async function POST(req: Request) {
       updatedAt: now,
     });
   } else if (parsed.data.channel === "EMAIL") {
-    const from = parsed.data.resendFromEmail.trim();
-    if (!z.string().email().safeParse(from).success) {
-      return badRequest("resendFromEmail must be a valid email address");
+    let from: string | null = null;
+    if (isResendSendFromEmailManagedByEnv()) {
+      if (parsed.data.resendFromEmail !== undefined) {
+        return badRequest("Resend sender is managed by this deployment");
+      }
+    } else {
+      from = parsed.data.resendFromEmail?.trim() ?? "";
+      if (!from || !z.string().email().safeParse(from).success) {
+        return badRequest("resendFromEmail must be a valid email address");
+      }
     }
     const toNorm = normalizeResendToEmailsForStorage(parsed.data.resendToEmails);
     if (!toNorm.ok) return badRequest(toNorm.error);
@@ -117,5 +129,8 @@ export async function POST(req: Request) {
     .where(eq(schema.notificationDestination.id, id))
     .limit(1);
 
-  return NextResponse.json({ destination: row }, { status: 201 });
+  return NextResponse.json(
+    { destination: row ? publicNotificationDestination(row) : row },
+    { status: 201 },
+  );
 }

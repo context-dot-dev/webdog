@@ -13,6 +13,7 @@ import {
   retrieveBrand,
   scrapeScreenshot,
 } from "@/lib/context-client";
+import { effectiveContextDevApiKey } from "@/lib/server-managed-config";
 
 export async function GET() {
   const { user, response } = await getApiUser();
@@ -59,11 +60,8 @@ export async function POST(req: Request) {
     .from(schema.userNotificationSettings)
     .where(eq(schema.userNotificationSettings.userId, ownerId))
     .limit(1);
-  const contextKey = settings?.contextDevApiKey?.trim() || null;
-
-  const hasContextKey = Boolean(
-    (contextKey?.trim() || process.env.CONTEXT_DEV_API_KEY?.trim() || undefined),
-  );
+  const contextKey = effectiveContextDevApiKey(settings?.contextDevApiKey);
+  const hasContextKey = Boolean(contextKey);
 
   let assets = pickBrandAssets(null);
   let heroScreenshotUrl: string | null = null;
