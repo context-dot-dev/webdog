@@ -21,8 +21,8 @@ export default async function SettingsPage() {
     return (
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-12">
         <header>
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Settings</h1>
-          <p className="mt-1 text-sm text-neutral-600">Account and notification preferences.</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Settings</h1>
+          <p className="mt-2 text-sm text-neutral-600">Account and notification preferences.</p>
         </header>
         <div className="mt-8">
           <AccountScopePrompt choices={choices} />
@@ -52,7 +52,7 @@ export default async function SettingsPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-12">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Settings</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Settings</h1>
         <p className="mt-1 text-sm text-neutral-600">Account and notification preferences.</p>
       </header>
 

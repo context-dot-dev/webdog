@@ -38,8 +38,8 @@ function WebsiteLogoAvatar({
   compact?: boolean;
 }) {
   const frame = compact
-    ? "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-xs ring-1 ring-neutral-950/10"
-    : "flex size-14 items-center justify-center overflow-hidden rounded-xl bg-white shadow-xs ring-1 ring-neutral-950/10";
+    ? "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-xs ring-1 ring-neutral-900/10"
+    : "flex size-14 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-xs ring-1 ring-neutral-900/10";
 
   return (
     <div className={`${frame} ${className}`}>
@@ -105,8 +105,8 @@ export function WebsiteListView({ websites }: { websites: Website[] }) {
     <>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Websites</h1>
-          <p className="mt-1 text-sm text-neutral-600">
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Websites</h1>
+          <p className="mt-2 text-sm text-neutral-600">
             Every site you&apos;re watching. Add a new one to start tracking changes.
           </p>
         </div>
@@ -116,17 +116,17 @@ export function WebsiteListView({ websites }: { websites: Website[] }) {
           <div
             role="group"
             aria-label="View mode"
-            className="flex rounded-lg ring-1 ring-neutral-950/10 overflow-hidden bg-white"
+            className="flex rounded-full ring-1 ring-neutral-900/10 overflow-hidden bg-white p-0.5"
           >
             <button
               type="button"
               onClick={() => switchView("grid")}
               aria-pressed={view === "grid"}
               aria-label="Grid view"
-              className={`flex h-8 min-w-8 items-center justify-center px-2.5 text-sm transition ${
+              className={`flex h-8 min-w-8 items-center justify-center rounded-full px-3 text-sm transition ${
                 view === "grid"
-                  ? "bg-neutral-100 text-neutral-900"
-                  : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
+                  ? "bg-neutral-900 text-cream-100"
+                  : "text-neutral-500 hover:text-neutral-800"
               }`}
             >
               <GridIcon className="size-4" />
@@ -136,10 +136,10 @@ export function WebsiteListView({ websites }: { websites: Website[] }) {
               onClick={() => switchView("list")}
               aria-pressed={view === "list"}
               aria-label="List view"
-              className={`flex h-8 min-w-8 items-center justify-center px-2.5 text-sm transition border-l border-neutral-950/10 ${
+              className={`flex h-8 min-w-8 items-center justify-center rounded-full px-3 text-sm transition ${
                 view === "list"
-                  ? "bg-neutral-100 text-neutral-900"
-                  : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
+                  ? "bg-neutral-900 text-cream-100"
+                  : "text-neutral-500 hover:text-neutral-800"
               }`}
             >
               <ListIcon className="size-4" />
@@ -170,7 +170,7 @@ function GridView({ websites }: { websites: Website[] }) {
         <li key={w.id}>
           <Link
             href={`/dashboard/websites/${w.id}`}
-            className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-xs ring-1 ring-neutral-950/5 transition hover:shadow-card hover:ring-neutral-950/10"
+            className="group flex h-full flex-col overflow-hidden rounded-3xl bg-white ring-1 ring-neutral-900/5 transition hover:-translate-y-0.5 hover:shadow-soft hover:ring-neutral-900/10"
           >
             <div className="relative z-0 h-28 overflow-hidden bg-neutral-100">
               {w.heroScreenshotUrl || w.backdropUrl ? (
@@ -245,13 +245,13 @@ function ListView({ websites }: { websites: Website[] }) {
   return (
     <ul
       role="list"
-      className="divide-y divide-neutral-950/5 overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-950/5"
+      className="divide-y divide-neutral-900/5 overflow-hidden rounded-3xl bg-white ring-1 ring-neutral-900/5"
     >
       {websites.map((w) => (
         <li key={w.id}>
           <Link
             href={`/dashboard/websites/${w.id}`}
-            className="group flex items-center gap-4 px-5 py-3.5 transition hover:bg-neutral-50"
+            className="group flex items-center gap-4 px-5 py-3.5 transition hover:bg-cream-50"
           >
             <WebsiteLogoAvatar
               logoUrl={w.logoUrl}
@@ -290,12 +290,12 @@ function ListView({ websites }: { websites: Website[] }) {
             {/* Unread badge */}
             <div className="flex w-16 justify-end">
               {Number(w.unreadAlerts) > 0 ? (
-                <span className="inline-flex items-center rounded-full bg-brand-500 px-2 py-0.5 text-xs font-medium text-white ring-1 ring-brand-600/20">
+                <span className="inline-flex items-center rounded-full bg-peach px-2.5 py-0.5 text-xs font-semibold text-neutral-900 ring-1 ring-neutral-900/5">
                   {Number(w.unreadAlerts)} new
                 </span>
               ) : (
-                <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
-                  0 new
+                <span className="inline-flex items-center rounded-full bg-mint/60 px-2.5 py-0.5 text-xs font-medium text-neutral-700 ring-1 ring-neutral-900/5">
+                  all clear
                 </span>
               )}
             </div>
@@ -339,15 +339,12 @@ function Stat({
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl bg-white px-6 py-16 text-center ring-1 ring-neutral-950/5">
-      <div className="flex size-12 items-center justify-center rounded-full bg-brand-50 ring-1 ring-brand-500/20">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-5 text-brand-600">
-          <circle cx="8" cy="8" r="6" />
-          <path d="M2 8h12M8 2a9 9 0 0 1 0 12M8 2a9 9 0 0 0 0 12" />
-        </svg>
+    <div className="flex flex-col items-center justify-center rounded-3xl bg-white px-6 py-20 text-center ring-1 ring-neutral-900/5">
+      <div className="grid size-16 place-items-center rounded-3xl bg-peach text-3xl ring-1 ring-neutral-900/5">
+        🌱
       </div>
-      <h2 className="mt-4 text-base font-medium text-neutral-900">No websites yet</h2>
-      <p className="mt-1 max-w-[40ch] text-pretty text-sm text-neutral-600">
+      <h2 className="mt-5 text-lg font-semibold text-neutral-900">No websites yet</h2>
+      <p className="mt-2 max-w-[40ch] text-pretty text-sm text-neutral-600">
         Add a website to start watching for new links, removed links, or content changes.
       </p>
       <div className="mt-6">

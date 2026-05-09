@@ -16,6 +16,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
+    "db:reset": "rm -f data/web-watchdog.db data/web-watchdog.db-shm data/web-watchdog.db-wal && drizzle-kit push",
     "lint": "next lint"
   },
   "dependencies": {

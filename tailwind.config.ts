@@ -6,6 +6,7 @@ export default {
     extend: {
       fontFamily: {
         sans: [
+          "Figtree",
           "InterVariable",
           "Inter",
           "ui-sans-serif",
@@ -31,10 +32,19 @@ export default {
           900: "#7f2511",
           950: "#451005",
         },
+        cream: {
+          50: "#fefaf3",
+          100: "#fdf6ec",
+          200: "#f7ecd8",
+        },
+        peach: "#ffd5b5",
+        mint: "#cdebd6",
+        lavender: "#e7d6ff",
       },
       boxShadow: {
         xs: "0 1px 2px rgba(10, 10, 18, 0.04)",
         card: "0 1px 2px rgba(10, 10, 18, 0.04), 0 1px 3px rgba(10, 10, 18, 0.06)",
+        soft: "0 1px 0 rgba(10, 10, 18, 0.02), 0 8px 24px -16px rgba(180, 110, 50, 0.18)",
       },
     },
   },

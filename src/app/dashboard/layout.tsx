@@ -7,7 +7,6 @@ import { websiteOwnerAccessible } from "@/lib/account-access";
 import { getEffectiveAccountOwnerForWrites, loadAccountChoices } from "@/lib/effective-account";
 import { requireUser } from "@/lib/session";
 import { AccountSwitcher } from "@/components/account-switcher";
-import { LogoMark } from "@/components/logo";
 import { MobileNav } from "@/components/mobile-nav";
 import { TopNav } from "@/components/top-nav";
 import { HeaderUserMenu } from "@/components/header-user-menu";
@@ -48,20 +47,27 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const unreadAlertCount = unreadRow?.n ?? 0;
 
   return (
-    <div className="isolate min-h-dvh bg-neutral-50/50 antialiased">
-      <header className="sticky top-0 z-40 border-b border-neutral-950/5 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+    <div className="relative isolate min-h-dvh overflow-x-hidden bg-cream-100 antialiased">
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-40 -left-40 size-[480px] rounded-full bg-peach opacity-50 blur-3xl" />
+        <div className="absolute top-20 -right-40 size-[420px] rounded-full bg-mint opacity-40 blur-3xl" />
+      </div>
+
+      <header className="sticky top-0 z-40 bg-cream-100/80 backdrop-blur supports-[backdrop-filter]:bg-cream-100/70">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6 lg:px-8">
           <Link
             href="/dashboard"
             aria-label="Web Watchdog home"
-            className="flex shrink-0 items-center gap-2"
+            className="flex shrink-0 items-center gap-2.5"
           >
-            <LogoMark className="size-7" />
+            <span className="grid size-9 place-items-center rounded-2xl bg-neutral-900 text-xl text-cream-100">
+              🐶
+            </span>
             <span className="hidden font-semibold tracking-tight text-neutral-900 sm:inline">
               Web Watchdog
             </span>
           </Link>
-          <span aria-hidden className="hidden h-5 w-px bg-neutral-950/10 lg:inline-block" />
+          <span aria-hidden className="hidden h-5 w-px bg-neutral-900/10 lg:inline-block" />
           <TopNav className="hidden lg:flex" unreadAlertCount={unreadAlertCount} />
           <AccountSwitcher
             className="hidden lg:flex"
@@ -88,7 +94,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </header>
 
-      <main className="min-w-0">{children}</main>
+      <main className="relative min-w-0">{children}</main>
     </div>
   );
 }

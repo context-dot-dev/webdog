@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@300..900&display=swap");
 @import url("https://rsms.me/inter/inter.css");
 @import url("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap");
 
@@ -19,7 +20,7 @@
   }
 
   body {
-    @apply bg-white text-neutral-900;
+    @apply bg-cream-100 text-neutral-900;
   }
 
   /* Focus ring defaults matching brand accent */
@@ -36,27 +37,27 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-neutral-900 text-white hover:bg-neutral-800 px-3 py-2 shadow-xs ring-1 ring-neutral-900;
+    @apply btn bg-neutral-900 text-cream-100 hover:bg-neutral-800 px-4 py-2 ring-1 ring-neutral-900;
   }
   .btn-accent {
-    @apply btn bg-brand-500 text-white hover:bg-brand-600 px-3 py-2 shadow-xs ring-1 ring-brand-500;
+    @apply btn bg-brand-500 text-white hover:bg-brand-600 px-4 py-2 shadow-xs ring-1 ring-brand-500;
   }
   .btn-secondary {
-    @apply btn bg-white text-neutral-900 px-3 py-2 ring-1 ring-neutral-950/10 hover:bg-neutral-50;
+    @apply btn bg-white text-neutral-900 px-4 py-2 ring-1 ring-neutral-900/10 hover:bg-cream-50;
   }
   .btn-ghost {
-    @apply btn border border-neutral-200 bg-white text-neutral-700 shadow-xs px-2.5 py-1.5 hover:border-neutral-300 hover:bg-neutral-50;
+    @apply btn bg-transparent text-neutral-700 px-3 py-1.5 hover:bg-white/70;
   }
   .input {
-    @apply block w-full rounded-lg bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 ring-1 ring-neutral-950/10 focus:ring-2 focus:ring-brand-500 focus:outline-none;
+    @apply block w-full rounded-2xl bg-white px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 ring-1 ring-neutral-900/10 focus:ring-2 focus:ring-brand-500 focus:outline-none;
   }
   .card {
-    @apply rounded-xl bg-white ring-1 ring-neutral-950/5 shadow-xs;
+    @apply rounded-3xl bg-white ring-1 ring-neutral-900/5 shadow-soft;
   }
   .kbd {
-    @apply rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-xs text-neutral-500;
+    @apply rounded-lg border border-neutral-200 bg-cream-50 px-1.5 py-0.5 font-mono text-xs text-neutral-500;
   }
 }

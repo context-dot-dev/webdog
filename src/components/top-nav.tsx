@@ -47,10 +47,10 @@ export function TopNav({
                 ? `${label}, ${alertsUnread} unread`
                 : undefined
             }
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm transition ${
               active
-                ? "bg-neutral-100 text-neutral-900"
-                : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                ? "bg-neutral-900 text-cream-100"
+                : "text-neutral-700 hover:bg-white/70 hover:text-neutral-900"
             }`}
           >
             {label}

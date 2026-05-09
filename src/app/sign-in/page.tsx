@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Logo } from "@/components/logo";
 import { previewInviteFromRawToken } from "@/lib/account-invite-preview";
 import { signInInviteSubtitle } from "@/lib/auth-invite-copy";
 import { getCurrentSession } from "@/lib/session";
@@ -19,20 +18,23 @@ export default async function SignInPage({
   const invitePreview = inviteToken ? await previewInviteFromRawToken(inviteToken) : null;
 
   return (
-    <main className="grid min-h-dvh grid-cols-1 bg-white lg:grid-cols-[1fr_42%]">
+    <main className="grid min-h-dvh grid-cols-1 bg-cream-100 lg:grid-cols-[1fr_42%]">
       <div className="flex flex-col justify-between p-6 sm:p-10">
-        <Link href="/" aria-label="Home">
-          <Logo />
+        <Link href="/" aria-label="Home" className="flex items-center gap-2.5">
+          <span className="grid size-9 place-items-center rounded-2xl bg-neutral-900 text-xl text-cream-100">
+            🐶
+          </span>
+          <span className="text-lg font-semibold">Web Watchdog</span>
         </Link>
         <div className="mx-auto w-full max-w-xs">
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Welcome back</h1>
-          <p className="mt-1 text-sm text-neutral-600">{signInInviteSubtitle(inviteToken, invitePreview)}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Welcome back</h1>
+          <p className="mt-2 text-sm text-neutral-600">{signInInviteSubtitle(inviteToken, invitePreview)}</p>
           <SignInForm className="mt-8" inviteToken={inviteToken} />
           <p className="mt-6 text-sm text-neutral-600">
             New here?{" "}
             <Link
               href={inviteToken ? `/sign-up?invite=${encodeURIComponent(inviteToken)}` : "/sign-up"}
-              className="font-medium text-brand-600 hover:text-brand-700"
+              className="font-semibold text-brand-600 hover:text-brand-700"
             >
               Create an account
             </Link>
@@ -49,20 +51,41 @@ export default async function SignInPage({
 
 function AsidePanel() {
   return (
-    <aside className="relative hidden overflow-hidden bg-neutral-950 text-white lg:block">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,90,31,0.25),transparent_60%)]" />
-      <div className="absolute inset-0 [background-image:linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:40px_40px]" />
-      <div className="relative flex h-full flex-col justify-between p-12">
-        <div />
-        <div>
-          <p className="max-w-[34ch] text-balance text-2xl font-medium tracking-tight">
-            Screenshots and diffs when the pages you rely on change, without another brittle scraper.
-          </p>
-          <div className="mt-6 text-sm text-neutral-400">Proudly open source.</div>
+    <aside className="relative hidden overflow-hidden lg:block">
+      <div aria-hidden className="absolute inset-0">
+        <div className="absolute -top-32 -left-20 size-[420px] rounded-full bg-peach opacity-70 blur-3xl" />
+        <div className="absolute top-40 -right-32 size-[380px] rounded-full bg-mint opacity-70 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 size-[360px] rounded-full bg-lavender opacity-60 blur-3xl" />
+      </div>
+      <div className="relative flex h-full flex-col justify-between p-10">
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { c: "bg-mint", icon: "🟢", t: "vercel.com/pricing", note: "Two new pricing tiers." },
+            { c: "bg-peach", icon: "🔶", t: "stripe.com/legal/tos", note: "§4.2 was rewritten." },
+            { c: "bg-lavender", icon: "💜", t: "acme.co/careers", note: "Listing pulled." },
+            { c: "bg-white", icon: "✨", t: "yc.com/jobs", note: "47 new postings." },
+          ].map((m) => (
+            <div key={m.t} className={`rounded-2xl ${m.c} p-3.5 ring-1 ring-neutral-900/5`}>
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <span className="text-base">{m.icon}</span>
+                <span className="truncate font-mono text-neutral-700">{m.t}</span>
+              </div>
+              <p className="mt-1.5 text-xs text-pretty text-neutral-700">{m.note}</p>
+            </div>
+          ))}
         </div>
-        <div className="flex items-center gap-3 text-xs text-neutral-400">
-          <span className="inline-flex size-2 rounded-full bg-brand-500 shadow-[0_0_0_4px_rgba(255,90,31,0.2)]" />
-          Get notified on every change
+        <div>
+          <p className="max-w-[28ch] text-balance text-3xl font-semibold tracking-tight">
+            Your friendly little web watcher.
+          </p>
+          <p className="mt-3 max-w-[36ch] text-pretty text-sm text-neutral-700">
+            Screenshots and diffs when the pages you rely on change — without
+            another brittle scraper.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-neutral-700">
+          <span className="size-1.5 rounded-full bg-brand-500" />
+          Open source · self-hostable · MIT
         </div>
       </div>
     </aside>

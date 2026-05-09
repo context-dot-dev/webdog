@@ -54,8 +54,12 @@ export function InviteClient({ token }: { token: string }) {
   }, [router, token]);
 
   return (
-    <div className="mx-auto grid min-h-dvh max-w-xs place-items-center px-6">
-      <div className="w-full rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-neutral-950/5">
+    <div className="relative mx-auto grid min-h-dvh max-w-xs place-items-center px-6">
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-32 -left-32 size-[420px] rounded-full bg-peach opacity-50 blur-3xl" />
+        <div className="absolute -bottom-32 -right-32 size-[420px] rounded-full bg-mint opacity-50 blur-3xl" />
+      </div>
+      <div className="w-full rounded-3xl bg-white p-8 text-center shadow-soft ring-1 ring-neutral-900/5">
         {status === "working" && (
           <>
             <p className="text-sm font-medium text-neutral-900">Joining team…</p>
