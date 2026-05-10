@@ -12,8 +12,8 @@ dist
 *.tsbuildinfo
 
 # Environment (keep .env.example committed)
-.env
-.env*.local
+.env*
+!.env.example
 
 # Vercel
 .vercel

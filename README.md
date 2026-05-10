@@ -53,6 +53,8 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
 | `npm run start`    | Start production server (after `build`)         |
 | `npm run worker`   | Long-running worker that runs scrapes on a schedule |
 | `npm run worker:once` | Run the worker once and exit                 |
+| `npm run db:push` | Push the current schema to the configured SQLite database |
+| `npm run db:reset` | Delete the configured SQLite database (`DATABASE_URL` or default) and recreate the schema |
 | `npm run db:generate` | Generate SQL migration files from the schema  |
 | `npm run db:migrate`  | Run migrations (when you use generated files)  |
 

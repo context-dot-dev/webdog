@@ -16,7 +16,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:reset": "rm -f data/webdog-ai.db data/webdog-ai.db-shm data/webdog-ai.db-wal && drizzle-kit push",
+    "db:reset": "tsx scripts/reset-db.ts && drizzle-kit push",
     "lint": "next lint"
   },
   "dependencies": {

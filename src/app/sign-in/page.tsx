@@ -16,7 +16,9 @@ export default async function SignInPage({
 
   const { invite } = await searchParams;
   const inviteToken = invite?.trim() || null;
-  const invitePreview = inviteToken ? await previewInviteFromRawToken(inviteToken) : null;
+  const invitePreview = inviteToken
+    ? await previewInviteFromRawToken(inviteToken)
+    : null;
 
   return (
     <main className="grid min-h-dvh grid-cols-1 bg-cream-100 lg:grid-cols-[1fr_42%]">
@@ -28,13 +30,21 @@ export default async function SignInPage({
           <span className="text-lg font-semibold">{APP_NAME}</span>
         </Link>
         <div className="mx-auto w-full max-w-xs">
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Welcome back</h1>
-          <p className="mt-2 text-sm text-neutral-600">{signInInviteSubtitle(inviteToken, invitePreview)}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
+            Welcome back
+          </h1>
+          <p className="mt-2 text-sm text-neutral-600">
+            {signInInviteSubtitle(inviteToken, invitePreview)}
+          </p>
           <SignInForm className="mt-8" inviteToken={inviteToken} />
           <p className="mt-6 text-sm text-neutral-600">
             New here?{" "}
             <Link
-              href={inviteToken ? `/sign-up?invite=${encodeURIComponent(inviteToken)}` : "/sign-up"}
+              href={
+                inviteToken
+                  ? `/sign-up?invite=${encodeURIComponent(inviteToken)}`
+                  : "/sign-up"
+              }
               className="font-semibold text-brand-600 hover:text-brand-700"
             >
               Create an account
@@ -42,7 +52,8 @@ export default async function SignInPage({
           </p>
         </div>
         <p className="text-xs text-neutral-500">
-          &copy; {new Date().getFullYear()} Context.dev. Distributed under the MIT License.
+          &copy; {new Date().getFullYear()} Context.dev. Distributed under the
+          MIT License.
         </p>
       </div>
       <AsidePanel />
@@ -61,17 +72,44 @@ function AsidePanel() {
       <div className="relative flex h-full flex-col justify-between p-10">
         <div className="grid grid-cols-2 gap-3">
           {[
-            { c: "bg-mint", icon: "🟢", t: "vercel.com/pricing", note: "Two new pricing tiers." },
-            { c: "bg-peach", icon: "🔶", t: "stripe.com/legal/tos", note: "§4.2 was rewritten." },
-            { c: "bg-lavender", icon: "💜", t: "acme.co/careers", note: "Listing pulled." },
-            { c: "bg-white", icon: "✨", t: "yc.com/jobs", note: "47 new postings." },
+            {
+              c: "bg-mint",
+              icon: "🟢",
+              t: "example.com/changelog",
+              note: "New release note.",
+            },
+            {
+              c: "bg-peach",
+              icon: "🔶",
+              t: "stripe.com/legal/tos",
+              note: "§4.2 was rewritten.",
+            },
+            {
+              c: "bg-lavender",
+              icon: "💜",
+              t: "acme.co/careers",
+              note: "Listing pulled.",
+            },
+            {
+              c: "bg-white",
+              icon: "✨",
+              t: "yc.com/jobs",
+              note: "47 new postings.",
+            },
           ].map((m) => (
-            <div key={m.t} className={`rounded-2xl ${m.c} p-3.5 ring-1 ring-neutral-900/5`}>
+            <div
+              key={m.t}
+              className={`rounded-2xl ${m.c} p-3.5 ring-1 ring-neutral-900/5`}
+            >
               <div className="flex items-center gap-1.5 text-xs font-medium">
                 <span className="text-base">{m.icon}</span>
-                <span className="truncate font-mono text-neutral-700">{m.t}</span>
+                <span className="truncate font-mono text-neutral-700">
+                  {m.t}
+                </span>
               </div>
-              <p className="mt-1.5 text-xs text-pretty text-neutral-700">{m.note}</p>
+              <p className="mt-1.5 text-xs text-pretty text-neutral-700">
+                {m.note}
+              </p>
             </div>
           ))}
         </div>

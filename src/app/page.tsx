@@ -20,18 +20,23 @@ export default async function LandingPage() {
 
       <header className="relative mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-2xl bg-neutral-900 text-2xl text-[#fdf6ec]">🐶</span>
+          <span className="grid size-9 place-items-center rounded-2xl bg-neutral-900 text-2xl text-[#fdf6ec]">
+            🐶
+          </span>
           <span className="text-lg font-semibold">{APP_NAME}</span>
         </div>
         <nav className="flex items-center gap-2">
-          <Link href="#features" className="rounded-full px-4 py-2 text-sm text-neutral-700 hover:bg-white/60">Features</Link>
-          <Link href="#pricing" className="rounded-full px-4 py-2 text-sm text-neutral-700 hover:bg-white/60">Pricing</Link>
-          <Link href="/sign-in" className="rounded-full px-4 py-2 text-sm text-neutral-700 hover:bg-white/60">Sign in</Link>
+          <Link
+            href="/sign-in"
+            className="rounded-full px-4 py-2 text-sm text-neutral-700 hover:bg-white/60"
+          >
+            Sign in
+          </Link>
           <Link
             href="/sign-up"
             className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-semibold text-[#fdf6ec] transition hover:bg-neutral-800"
           >
-            Try free
+            Create account
           </Link>
         </nav>
       </header>
@@ -62,16 +67,16 @@ export default async function LandingPage() {
           .
         </h1>
         <p className="mx-auto mt-8 max-w-[52ch] text-pretty text-lg text-neutral-700">
-          {APP_NAME} keeps an eye on the pages you care about — a new blog
-          post, a removed job listing, a quietly tweaked pricing page — and
-          gives you a friendly nudge the moment something changes.
+          {APP_NAME} keeps an eye on the pages you care about — a new blog post,
+          a removed job listing, a quietly changed policy page — and gives you a
+          friendly nudge the moment something changes.
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/sign-up"
             className="rounded-2xl bg-neutral-900 px-6 py-3 text-sm font-semibold text-[#fdf6ec] transition hover:translate-y-[-1px] hover:bg-neutral-800"
           >
-            Get started — it&apos;s free 🍊
+            Get started
           </Link>
           <a
             href="https://github.com"
@@ -88,8 +93,8 @@ export default async function LandingPage() {
             {
               c: "bg-[#cdebd6]",
               icon: "🟢",
-              t: "vercel.com/pricing",
-              note: "Hey! Two new pricing tiers just appeared.",
+              t: "example.com/changelog",
+              note: "Hey! A new release note just appeared.",
               time: "2 min ago",
             },
             {
