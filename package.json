@@ -26,7 +26,7 @@
     "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.45.2",
     "next": "^15.1.11",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.2.1",
     "pg": "^8.20.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
