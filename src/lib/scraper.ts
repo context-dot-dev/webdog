@@ -337,16 +337,15 @@ export async function runWebsiteChecks(
       const nowMs = Date.now();
       // Read fresh interval + deadline inside a DB transaction so a concurrent PATCH
       // cannot leave checkIntervalHours and nextCheckDueAt mismatched after we scrape.
-      db.transaction((tx) => {
-        const fresh = tx
+      await db.transaction(async (tx) => {
+        const [fresh] = await tx
           .select({
             nextCheckDueAt: schema.target.nextCheckDueAt,
             checkIntervalHours: schema.target.checkIntervalHours,
           })
           .from(schema.target)
           .where(eq(schema.target.id, t.id))
-          .limit(1)
-          .get();
+          .limit(1);
 
         if (!fresh) return;
 
@@ -356,10 +355,10 @@ export async function runWebsiteChecks(
           nowMs,
         );
 
-        tx.update(schema.target)
+        await tx
+          .update(schema.target)
           .set({ lastCheckedAt: new Date(nowMs), nextCheckDueAt })
-          .where(eq(schema.target.id, t.id))
-          .run();
+          .where(eq(schema.target.id, t.id));
       });
     } catch (err) {
       errors += 1;

@@ -167,8 +167,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     .delete(schema.notificationDestination)
     .where(
       and(eq(schema.notificationDestination.id, id), eq(schema.notificationDestination.userId, ownerId)),
-    );
-  if (result.changes === 0) return notFound("Destination not found");
+    )
+    .returning({ id: schema.notificationDestination.id });
+  if (result.length === 0) return notFound("Destination not found");
 
   await pruneDeletedDestination(ownerId, id);
 

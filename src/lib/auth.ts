@@ -1,11 +1,7 @@
-import { randomBytes } from "node:crypto";
-import fs from "node:fs";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
 import * as schema from "./db/schema";
-
-const RAILWAY_AUTH_SECRET_FILE = "/data/.better-auth-secret";
 
 /** Trim slashes; keep a single usable origin-style base for Better Auth. */
 function normalizeAuthBase(urlStr: string): string {
@@ -142,28 +138,9 @@ const extraTrusted = loopbackOriginAlt(authFallbackOrigin);
 const NEXT_BUILD_AUTH_PLACEHOLDER =
   "next-build-placeholder-not-used-at-runtime-min-32-chars!!";
 
-function railwayPersistedAuthSecret(): string {
-  try {
-    fs.mkdirSync("/data", { recursive: true });
-    if (fs.existsSync(RAILWAY_AUTH_SECRET_FILE)) {
-      const existing = fs.readFileSync(RAILWAY_AUTH_SECRET_FILE, "utf8").trim();
-      if (existing.length >= 16) return existing;
-    }
-    const secret = randomBytes(32).toString("base64");
-    fs.writeFileSync(RAILWAY_AUTH_SECRET_FILE, secret, { mode: 0o600 });
-    return secret;
-  } catch (e) {
-    const hint = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      `Could not read or write ${RAILWAY_AUTH_SECRET_FILE}. Attach a Railway volume at /data (see README). ${hint}`,
-    );
-  }
-}
-
 /**
- * Better Auth requires a non-default `secret`. On Railway, if `BETTER_AUTH_SECRET` is unset,
- * a secret is created once on the persistent volume so one-click deploy only needs e.g. `CONTEXT_DEV_API_KEY`.
- * Vercel / Netlify / Cloudflare still require an explicit `BETTER_AUTH_SECRET`.
+ * Better Auth requires a non-default `secret`. Hosted production deploys
+ * require an explicit `BETTER_AUTH_SECRET`; local development keeps a dev-only fallback.
  */
 function resolveAuthSecret(): string {
   const fromEnv = process.env.BETTER_AUTH_SECRET?.trim();
@@ -173,13 +150,9 @@ function resolveAuthSecret(): string {
     return NEXT_BUILD_AUTH_PLACEHOLDER;
   }
 
-  if (process.env.RAILWAY_PROJECT_ID) {
-    return railwayPersistedAuthSecret();
-  }
-
   const isHostedProd =
     process.env.NODE_ENV === "production" &&
-    Boolean(process.env.VERCEL ?? process.env.CF_PAGES ?? process.env.NETLIFY);
+    Boolean(process.env.RAILWAY_PROJECT_ID ?? process.env.VERCEL ?? process.env.CF_PAGES ?? process.env.NETLIFY);
 
   if (isHostedProd) {
     throw new Error(
@@ -214,7 +187,7 @@ export const authPublicBaseUrl = authFallbackOrigin;
 export const auth = betterAuth({
   ...resolveAuthAdvanced(),
   database: drizzleAdapter(db, {
-    provider: "sqlite",
+    provider: "pg",
     schema: {
       user: schema.user,
       session: schema.session,

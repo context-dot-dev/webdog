@@ -71,8 +71,9 @@ export async function POST(req: Request) {
   try {
     const accountBrandLogoUrl = await resolveAccountBrandLogoUrl(sessionUser.email, trimmedKey);
 
-    db.transaction((tx) => {
-      tx.insert(schema.userNotificationSettings)
+    await db.transaction(async (tx) => {
+      await tx
+        .insert(schema.userNotificationSettings)
         .values({
           userId: sessionUser.id,
           contextDevApiKey: trimmedKey,
@@ -86,16 +87,15 @@ export async function POST(req: Request) {
             accountBrandLogoUrl,
             updatedAt: now,
           },
-        })
-        .run();
+        });
 
-      tx.update(schema.user)
+      await tx
+        .update(schema.user)
         .set({
           contextIntroDismissedAt: now,
           updatedAt: now,
         })
-        .where(eq(schema.user.id, sessionUser.id))
-        .run();
+        .where(eq(schema.user.id, sessionUser.id));
     });
 
     return NextResponse.json({

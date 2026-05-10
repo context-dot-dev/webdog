@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: `${APP_NAME} — open-source website change monitoring`,
   description:
-    "Watch websites for new links, removed links, or content changes. Open-source, self-hostable, SQLite-backed.",
+    "Watch websites for new links, removed links, or content changes. Open-source, self-hostable, PostgreSQL-backed.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

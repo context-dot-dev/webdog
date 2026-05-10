@@ -33,17 +33,16 @@ export async function POST(req: Request) {
     outcome,
     ownerUserIdForClient,
     skippedIntroSideEffects,
-  } = db.transaction((tx): {
+  } = await db.transaction(async (tx): Promise<{
     outcome: InviteRedeemOutcome;
     ownerUserIdForClient: string | null;
     skippedIntroSideEffects: boolean;
-  } => {
-    const inv = tx
+  }> => {
+    const [inv] = await tx
       .select()
       .from(schema.accountInvite)
       .where(eq(schema.accountInvite.tokenHash, tokenHash))
-      .limit(1)
-      .get();
+      .limit(1);
 
     if (!inv) {
       return {
@@ -71,7 +70,7 @@ export async function POST(req: Request) {
       };
     }
 
-    const existingMember = tx
+    const [existingMember] = await tx
       .select({ _: schema.accountMembership.memberUserId })
       .from(schema.accountMembership)
       .where(
@@ -80,8 +79,7 @@ export async function POST(req: Request) {
           eq(schema.accountMembership.memberUserId, user.id),
         ),
       )
-      .limit(1)
-      .get();
+      .limit(1);
 
     if (existingMember) {
       return {
@@ -99,7 +97,7 @@ export async function POST(req: Request) {
       };
     }
 
-    const inserted = tx
+    const inserted = await tx
       .insert(schema.accountMembership)
       .values({
         ownerUserId: inv.ownerUserId,
@@ -112,9 +110,9 @@ export async function POST(req: Request) {
           schema.accountMembership.memberUserId,
         ],
       })
-      .run();
+      .returning({ memberUserId: schema.accountMembership.memberUserId });
 
-    if (inserted.changes === 0) {
+    if (inserted.length === 0) {
       return {
         outcome: "ok_existing" as const,
         ownerUserIdForClient,
@@ -122,7 +120,7 @@ export async function POST(req: Request) {
       };
     }
 
-    const bumped = tx
+    const bumped = await tx
       .update(schema.accountInvite)
       .set({
         useCount: sql`${schema.accountInvite.useCount} + 1`,
@@ -135,21 +133,20 @@ export async function POST(req: Request) {
           lt(schema.accountInvite.useCount, schema.accountInvite.maxUses),
         ),
       )
-      .run();
+      .returning({ id: schema.accountInvite.id });
 
-    if (bumped.changes === 0) {
+    if (bumped.length === 0) {
       // Optimistic membership insert then compensating delete: between those
-      // statements the row exists only inside this serialized SQLite
-      // transaction; other connections cannot observe it until commit, and the
-      // whole callback rolls back on throw.
-      tx.delete(schema.accountMembership)
+      // statements the row exists only inside this transaction; other
+      // connections cannot observe it until commit.
+      await tx
+        .delete(schema.accountMembership)
         .where(
           and(
             eq(schema.accountMembership.ownerUserId, inv.ownerUserId),
             eq(schema.accountMembership.memberUserId, user.id),
           ),
-        )
-        .run();
+        );
       return {
         outcome: "used" as const,
         ownerUserIdForClient,

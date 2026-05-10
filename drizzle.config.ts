@@ -1,16 +1,14 @@
+import "dotenv/config";
+
 import type { Config } from "drizzle-kit";
-import {
-  ensureSQLiteParentDir,
-  resolveDatabaseUrl,
-} from "./src/lib/db/database-path";
+import { resolveDatabaseUrl } from "./src/lib/db/database-url";
 
 const url = resolveDatabaseUrl();
-ensureSQLiteParentDir(url);
 
 export default {
   schema: "./src/lib/db/schema.ts",
   out: "./drizzle",
-  dialect: "sqlite",
+  dialect: "postgresql",
   dbCredentials: {
     url,
   },

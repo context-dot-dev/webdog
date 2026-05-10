@@ -31,8 +31,8 @@ export async function GET() {
       heroScreenshotUrl: schema.website.heroScreenshotUrl,
       backdropUrl: schema.website.backdropUrl,
       createdAt: schema.website.createdAt,
-      targetCount: sql<number>`(SELECT COUNT(*) FROM ${schema.target} WHERE ${schema.target.websiteId} = ${schema.website.id})`,
-      alertCount: sql<number>`(SELECT COUNT(*) FROM ${schema.alert} WHERE ${schema.alert.websiteId} = ${schema.website.id} AND ${schema.alert.read} = 0)`,
+      targetCount: sql<number>`(SELECT COUNT(*)::int FROM ${schema.target} WHERE ${schema.target.websiteId} = ${schema.website.id})`,
+      alertCount: sql<number>`(SELECT COUNT(*)::int FROM ${schema.alert} WHERE ${schema.alert.websiteId} = ${schema.website.id} AND ${schema.alert.read} = false)`,
     })
     .from(schema.website)
     .where(websiteOwnerAccessible(user.id))

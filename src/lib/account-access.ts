@@ -1,5 +1,5 @@
 import { and, eq, exists, or, sql } from "drizzle-orm";
-import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "./db";
 import * as schema from "./db/schema";
 
@@ -27,7 +27,7 @@ export function websiteOwnerAccessible(viewerUserId: string) {
 /**
  * Tables keyed by owning user id (destinations, notification settings) use the same rule.
  */
-export function accountOwnerColumnAccessible(ownerUserIdColumn: SQLiteColumn, viewerUserId: string) {
+export function accountOwnerColumnAccessible(ownerUserIdColumn: AnyPgColumn, viewerUserId: string) {
   return or(
     eq(ownerUserIdColumn, viewerUserId),
     exists(

@@ -1,44 +1,44 @@
-import { sql } from "drizzle-orm";
 import {
-  integer,
-  primaryKey,
-  real,
-  sqliteTable,
-  text,
-  uniqueIndex,
+  boolean,
+  doublePrecision,
   index,
-} from "drizzle-orm/sqlite-core";
+  integer,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 /* ------------------------------------------------------------------ */
 /* BetterAuth core tables — field names follow the BetterAuth defaults. */
 /* ------------------------------------------------------------------ */
 
-export const user = sqliteTable("user", {
+export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  emailVerified: integer("emailVerified", { mode: "boolean" }).notNull().default(false),
+  emailVerified: boolean("emailVerified").notNull().default(false),
   image: text("image"),
   /** Set when user finishes or defers Context.dev onboarding; null means gate /dashboard. */
-  contextIntroDismissedAt: integer("contextIntroDismissedAt", { mode: "timestamp_ms" }),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+  contextIntroDismissedAt: timestamp("contextIntroDismissedAt", { withTimezone: true, precision: 3 }),
+  createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 }).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true, precision: 3 }).notNull(),
 });
 
-export const session = sqliteTable("session", {
+export const session = pgTable("session", {
   id: text("id").primaryKey(),
   userId: text("userId")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   token: text("token").notNull().unique(),
-  expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true, precision: 3 }).notNull(),
   ipAddress: text("ipAddress"),
   userAgent: text("userAgent"),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 }).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true, precision: 3 }).notNull(),
 });
 
-export const account = sqliteTable("account", {
+export const account = pgTable("account", {
   id: text("id").primaryKey(),
   userId: text("userId")
     .notNull()
@@ -48,27 +48,27 @@ export const account = sqliteTable("account", {
   accessToken: text("accessToken"),
   refreshToken: text("refreshToken"),
   idToken: text("idToken"),
-  accessTokenExpiresAt: integer("accessTokenExpiresAt", { mode: "timestamp_ms" }),
-  refreshTokenExpiresAt: integer("refreshTokenExpiresAt", { mode: "timestamp_ms" }),
+  accessTokenExpiresAt: timestamp("accessTokenExpiresAt", { withTimezone: true, precision: 3 }),
+  refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", { withTimezone: true, precision: 3 }),
   scope: text("scope"),
   password: text("password"),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 }).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true, precision: 3 }).notNull(),
 });
 
-export const verification = sqliteTable("verification", {
+export const verification = pgTable("verification", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
-  expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }),
+  expiresAt: timestamp("expiresAt", { withTimezone: true, precision: 3 }).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 }),
+  updatedAt: timestamp("updatedAt", { withTimezone: true, precision: 3 }),
 });
 
 /**
  * One row per user: shared secrets (Resend API key, context.dev) not tied to a single destination.
  */
-export const userNotificationSettings = sqliteTable("userNotificationSettings", {
+export const userNotificationSettings = pgTable("userNotificationSettings", {
   userId: text("userId")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -78,15 +78,15 @@ export const userNotificationSettings = sqliteTable("userNotificationSettings", 
   accountBrandLogoUrl: text("accountBrandLogoUrl"),
   /** Per-account Resend API key used only when RESEND_API_KEY is not configured on the server. */
   resendApiKey: text("resendApiKey"),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+  updatedAt: timestamp("updatedAt", { withTimezone: true, precision: 3 })
     .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+    .defaultNow(),
 });
 
 /**
  * Named outbound integrations (Slack webhooks, email routes, generic JSON webhooks).
  */
-export const notificationDestination = sqliteTable(
+export const notificationDestination = pgTable(
   "notificationDestination",
   {
     id: text("id").primaryKey(),
@@ -99,12 +99,12 @@ export const notificationDestination = sqliteTable(
     resendFromEmail: text("resendFromEmail"),
     resendToEmails: text("resendToEmails"),
     alertWebhookUrl: text("alertWebhookUrl"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true, precision: 3 })
       .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+      .defaultNow(),
   },
   (t) => ({
     byUser: index("notification_destination_user_idx").on(t.userId),
@@ -115,7 +115,7 @@ export const notificationDestination = sqliteTable(
 /* Domain tables                                                      */
 /* ------------------------------------------------------------------ */
 
-export const website = sqliteTable(
+export const website = pgTable(
   "website",
   {
     id: text("id").primaryKey(),
@@ -136,9 +136,9 @@ export const website = sqliteTable(
      * Use `[]` to disable notifications for this site.
      */
     notificationDestinationIds: text("notificationDestinationIds"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+      .defaultNow(),
   },
   (t) => ({
     byUser: index("website_user_idx").on(t.userId),
@@ -151,7 +151,7 @@ export const website = sqliteTable(
  *   PAGE_CONTENT      — alert when a specific page's markdown changes
  *   PRODUCT_PRICE     — alert when a product page's price/currency changes (context.dev product API)
  */
-export const target = sqliteTable(
+export const target = pgTable(
   "target",
   {
     id: text("id").primaryKey(),
@@ -163,24 +163,24 @@ export const target = sqliteTable(
     linkScope: text("linkScope", { enum: ["NEW", "REMOVED", "BOTH"] }),
     /** For PAGE_CONTENT / PRODUCT_PRICE: the page URL. Null for sitemap-based targets. */
     pageUrl: text("pageUrl"),
-    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    enabled: boolean("enabled").notNull().default(true),
     /** Minimum spacing between successful checks (hours, fractional OK — e.g. 0.25 = 15m); worker wakes per SCRAPE_CRON. */
-    checkIntervalHours: real("checkIntervalHours").notNull().default(1),
+    checkIntervalHours: doublePrecision("checkIntervalHours").notNull().default(1),
     /** Sole eligibility clock for scheduled runs; advanced by fixed interval after success. Null = due immediately. */
-    nextCheckDueAt: integer("nextCheckDueAt", { mode: "timestamp_ms" }),
-    lastCheckedAt: integer("lastCheckedAt", { mode: "timestamp_ms" }),
+    nextCheckDueAt: timestamp("nextCheckDueAt", { withTimezone: true, precision: 3 }),
+    lastCheckedAt: timestamp("lastCheckedAt", { withTimezone: true, precision: 3 }),
     /**
      * When false, alerts are stored only in-app — no Slack/email/webhook for this target.
      * When true, `notificationDestinationId` selects the target's external destination.
      */
-    externalNotify: integer("externalNotify", { mode: "boolean" }).notNull().default(true),
+    externalNotify: boolean("externalNotify").notNull().default(true),
     notificationDestinationId: text("notificationDestinationId").references(
       () => notificationDestination.id,
       { onDelete: "set null" },
     ),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+      .defaultNow(),
   },
   (t) => ({
     byWebsite: index("target_website_idx").on(t.websiteId),
@@ -195,7 +195,7 @@ export const target = sqliteTable(
  *  - kind=MARKDOWN        payload = markdown body; targetUrl set
  *  - kind=PRODUCT        payload = JSON of extracted product/price; targetUrl = product page URL
  */
-export const snapshot = sqliteTable(
+export const snapshot = pgTable(
   "snapshot",
   {
     id: text("id").primaryKey(),
@@ -208,16 +208,16 @@ export const snapshot = sqliteTable(
     payload: text("payload").notNull(),
     /** sha256 of payload — cheap equality checks. */
     hash: text("hash").notNull(),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+      .defaultNow(),
   },
   (t) => ({
     byLookup: index("snapshot_lookup_idx").on(t.websiteId, t.kind, t.targetUrl, t.createdAt),
   }),
 );
 
-export const alert = sqliteTable(
+export const alert = pgTable(
   "alert",
   {
     id: text("id").primaryKey(),
@@ -231,10 +231,10 @@ export const alert = sqliteTable(
     title: text("title").notNull(),
     /** JSON: link/content/product fields depending on kind */
     details: text("details").notNull(),
-    read: integer("read", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    read: boolean("read").notNull().default(false),
+    createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+      .defaultNow(),
   },
   (t) => ({
     byWebsite: index("alert_website_idx").on(t.websiteId, t.createdAt),
@@ -243,7 +243,7 @@ export const alert = sqliteTable(
 );
 
 /** Additional users invited to operate on rows keyed by ownerUserId (same as website.userId for that account). */
-export const accountMembership = sqliteTable(
+export const accountMembership = pgTable(
   "accountMembership",
   {
     ownerUserId: text("ownerUserId")
@@ -252,9 +252,9 @@ export const accountMembership = sqliteTable(
     memberUserId: text("memberUserId")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+      .defaultNow(),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.ownerUserId, t.memberUserId] }),
@@ -266,7 +266,7 @@ export const accountMembership = sqliteTable(
  * Multi-seat time-limited invite; store only tokenHash of the opaque token shown in URL.
  * `organizationLabel` is a snapshot for auth-page copy when the invite is opened without login.
  */
-export const accountInvite = sqliteTable(
+export const accountInvite = pgTable(
   "accountInvite",
   {
     id: text("id").primaryKey(),
@@ -274,10 +274,10 @@ export const accountInvite = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     tokenHash: text("tokenHash").notNull().unique(),
-    expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    expiresAt: timestamp("expiresAt", { withTimezone: true, precision: 3 }).notNull(),
+    createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+      .defaultNow(),
     createdByUserId: text("createdByUserId")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -285,7 +285,7 @@ export const accountInvite = sqliteTable(
     organizationLabel: text("organizationLabel"),
     maxUses: integer("maxUses").notNull().default(5),
     useCount: integer("useCount").notNull().default(0),
-    redeemedAt: integer("redeemedAt", { mode: "timestamp_ms" }),
+    redeemedAt: timestamp("redeemedAt", { withTimezone: true, precision: 3 }),
     redeemedByUserId: text("redeemedByUserId").references(() => user.id, { onDelete: "set null" }),
   },
   (t) => ({

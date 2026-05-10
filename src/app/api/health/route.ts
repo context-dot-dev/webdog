@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { rawSqlite } from "@/lib/db";
+import { sql } from "drizzle-orm";
+import { db } from "@/lib/db";
 
-/** Readiness-style check: verifies SQLite is reachable (Railway healthchecks). */
+/** Readiness-style check: verifies PostgreSQL is reachable (Railway healthchecks). */
 export async function GET() {
   try {
-    rawSqlite.prepare("SELECT 1").get();
+    await db.execute(sql`select 1`);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false }, { status: 503 });

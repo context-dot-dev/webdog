@@ -93,7 +93,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     .delete(schema.website)
     .where(
       and(eq(schema.website.id, id), eq(schema.website.userId, ownerId), websiteOwnerAccessible(user.id)),
-    );
-  if (result.changes === 0) return notFound("Website not found");
+    )
+    .returning({ id: schema.website.id });
+  if (result.length === 0) return notFound("Website not found");
   return NextResponse.json({ ok: true });
 }

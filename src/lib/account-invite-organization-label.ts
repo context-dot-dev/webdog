@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
 /**
- * Best-effort snapshot for invite UX — from onboarding data already in SQLite (website brand copy or profile name).
+ * Best-effort snapshot for invite UX — from onboarding data already in PostgreSQL (website brand copy or profile name).
  * Does not call Context.dev live.
  */
 export async function resolveOrganizationLabelForInvite(ownerUserId: string): Promise<string | null> {

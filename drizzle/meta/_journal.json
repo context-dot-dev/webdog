@@ -1,96 +1,12 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1777229389857,
-      "tag": "0000_melted_blackheart",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1777245700099,
-      "tag": "0001_hero_screenshot_url",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1777250000000,
-      "tag": "0002_resend_notification_settings",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1777260000000,
-      "tag": "0003_alert_webhook_url",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1777270000000,
-      "tag": "0004_notification_destinations",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1777280000000,
-      "tag": "0005_target_notification_destination",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1777290000000,
-      "tag": "0006_sitemap_links_target_kind",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1777300000000,
-      "tag": "0007_context_intro_brand_logo",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "6",
-      "when": 1777310000000,
-      "tag": "0008_target_next_check_due",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "6",
-      "when": 1777320000000,
-      "tag": "0009_target_external_notify",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "6",
-      "when": 1777330000000,
-      "tag": "0010_target_check_interval_real",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "6",
-      "when": 1777340000000,
-      "tag": "0011_account_invite_membership",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "6",
-      "when": 1777350000000,
-      "tag": "0012_account_invite_multi_use_org_label",
+      "version": "7",
+      "when": 1778382310264,
+      "tag": "0000_steep_king_cobra",
       "breakpoints": true
     }
   ]

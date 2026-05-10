@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   const targetStats = db
     .select({
       websiteId: schema.target.websiteId,
-      targetCount: sql<number>`COUNT(*)`.as("targetCount"),
+      targetCount: sql<number>`COUNT(*)::int`.as("targetCount"),
       lastCheckedAt: sql<number | null>`MAX(${schema.target.lastCheckedAt})`.as("lastCheckedAt"),
     })
     .from(schema.target)
@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   const alertStats = db
     .select({
       websiteId: schema.alert.websiteId,
-      unreadAlerts: sql<number>`SUM(CASE WHEN ${schema.alert.read} = 0 THEN 1 ELSE 0 END)`.as("unreadAlerts"),
+      unreadAlerts: sql<number>`SUM(CASE WHEN ${schema.alert.read} = false THEN 1 ELSE 0 END)::int`.as("unreadAlerts"),
     })
     .from(schema.alert)
     .groupBy(schema.alert.websiteId)

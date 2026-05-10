@@ -1,1 +1,0 @@
-ALTER TABLE `website` ADD `heroScreenshotUrl` text;

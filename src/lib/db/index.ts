@@ -1,45 +1,33 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import {
-  ensureSQLiteParentDir,
-  resolveDatabaseUrl,
-  sqliteFilePath,
-} from "./database-path";
+import { drizzle } from "drizzle-orm/node-postgres";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { resolveDatabaseUrl } from "./database-url";
 import * as schema from "./schema";
 
+type Db = NodePgDatabase<typeof schema>;
+
 type Connection = {
-  sqlite: Database.Database;
-  db: BetterSQLite3Database<typeof schema>;
+  db: Db;
 };
 
-let connection: Connection | null = null;
-
-function getConnection(): Connection {
-  if (connection) return connection;
-
-  const dbUrl = resolveDatabaseUrl();
-  ensureSQLiteParentDir(dbUrl);
-  const dbPath = sqliteFilePath(dbUrl);
-
-  const sqlite = new Database(dbPath);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-
-  connection = { sqlite, db: drizzle(sqlite, { schema }) };
-  return connection;
+declare global {
+  // eslint-disable-next-line no-var
+  var webdogPgConnection: Connection | undefined;
 }
 
-export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
+function getConnection(): Connection {
+  if (globalThis.webdogPgConnection) return globalThis.webdogPgConnection;
+
+  const databaseUrl = resolveDatabaseUrl();
+  const db = drizzle(databaseUrl, { schema });
+
+  globalThis.webdogPgConnection = { db };
+  return globalThis.webdogPgConnection;
+}
+
+export const db = new Proxy({} as Db, {
   get(_target, prop) {
     return (getConnection().db as unknown as Record<string | symbol, unknown>)[prop];
   },
 });
 
 export { schema };
-
-export const rawSqlite = new Proxy({} as Database.Database, {
-  get(_target, prop) {
-    return (getConnection().sqlite as unknown as Record<string | symbol, unknown>)[prop];
-  },
-});

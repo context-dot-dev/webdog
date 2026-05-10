@@ -6,6 +6,7 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
 
 - **Node.js** 20+ (recommended; matches Next.js 15)
 - **npm** (or your preferred package manager)
+- **PostgreSQL** 14+ for local development or a managed PostgreSQL service in production
 
 ## Setup
 
@@ -25,17 +26,17 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
    cp .env.example .env
    ```
 
-   At minimum for local development, set **`BETTER_AUTH_SECRET`** to a long random string (for example: `openssl rand -base64 32`). Other keys in `.env.example` are documented there; `DATABASE_URL` defaults to a SQLite file under `./data/` if unset.
+   At minimum for local development, set **`DATABASE_URL`** to your PostgreSQL connection string and set **`BETTER_AUTH_SECRET`** to a long random string (for example: `openssl rand -base64 32`). Other keys in `.env.example` are documented there.
 
 3. **Create the database schema**
 
-   The app uses **SQLite** with [Drizzle](https://orm.drizzle.team/). Apply the schema (creates auth tables, websites, targets, and so on):
+   The app uses **PostgreSQL** with [Drizzle](https://orm.drizzle.team/). Apply the schema (creates auth tables, websites, targets, and so on):
 
    ```bash
    npm run db:push
    ```
 
-   Without this step, the API will error with `no such table: user` (or similar) and sign-in / sign-up will not work.
+   Without this step, the API will error with `relation "user" does not exist` (or similar) and sign-in / sign-up will not work.
 
 4. **Run the app**
 
@@ -53,13 +54,14 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
 | `npm run start`    | Start production server (after `build`)         |
 | `npm run worker`   | Long-running worker that runs scrapes on a schedule |
 | `npm run worker:once` | Run the worker once and exit                 |
-| `npm run db:push` | Push the current schema to the configured SQLite database |
-| `npm run db:reset` | Delete the configured SQLite database (`DATABASE_URL` or default) and recreate the schema |
+| `npm run db:push` | Push the current schema to the configured PostgreSQL database |
+| `npm run db:reset` | Drop/recreate the configured PostgreSQL `public` schema, then push the current schema |
 | `npm run db:generate` | Generate SQL migration files from the schema  |
 | `npm run db:migrate`  | Run migrations (when you use generated files)  |
 
 ## Production notes
 
+- **`DATABASE_URL`** is required and must point at PostgreSQL (`postgres://` or `postgresql://`). Run migrations before serving traffic.
 - On **Railway**, omit **`BETTER_AUTH_URL`** to use **`https://${RAILWAY_PUBLIC_DOMAIN}`** when public networking is enabled; override with **`BETTER_AUTH_URL`** or **`NEXT_PUBLIC_APP_URL`** if needed (see **Deploy on Railway**). Elsewhere set **`BETTER_AUTH_URL`** to your public `https://…` URL. Keep **`BETTER_AUTH_SECRET`** private.
 - Server-managed **`CONTEXT_DEV_API_KEY`**, **`RESEND_API_KEY`**, and **`RESEND_SEND_FROM_EMAIL`** are used only on the server. When provided, the dashboard hides those account-level setup fields and does not return the values to the browser.
 - **`MAX_ALERTS`** can cap active monitors per account, and **`POSTFIX_TO_ALERTS`** can append deployment-specific text to new alerts.
@@ -77,9 +79,9 @@ Better Auth’s **`advanced.disableOriginCheck`** (here: opt in with **`BETTER_A
 Prefer fixing **`BETTER_AUTH_URL`**, **`BETTER_AUTH_ALLOWED_HOSTS`**, or **`BETTER_AUTH_TRUSTED_ORIGINS`** instead. A second env **`BETTER_AUTH_DISABLE_CSRF_CHECK=true`** turns off even more protections; do not use on public deployments.
 
 
-## Deploy on Railway (self-hosted, SQLite)
+## Deploy on Railway (self-hosted, PostgreSQL)
 
-The repo includes [`railway.json`](railway.json) so one **Railway service** runs both the Next.js app and the scrape **worker** in the same container. They share a single SQLite file on a **persistent volume** (ephemeral disk would reset the database on every deploy).
+The repo includes [`railway.json`](railway.json) so one **Railway service** runs both the Next.js app and the scrape **worker** in the same container. Add a Railway PostgreSQL service and expose its connection string to the app as **`DATABASE_URL`**.
 
 ### Public URL / Better Auth (Railway defaults vs configuration)
 
@@ -101,21 +103,21 @@ You still **configure** the deployment so one of these resolves to a real HTTPS 
 - **`RESEND_API_KEY`** and **`RESEND_SEND_FROM_EMAIL`** — optional server-managed email delivery for all accounts.
 - **`MAX_ALERTS`** — optional maximum active monitors per account.
 - **`POSTFIX_TO_ALERTS`** — optional text appended to new alert titles and outbound email subjects.
-- **`DATABASE_URL`** — optional; defaults to `/data/webdog-ai.db` on Railway when unset.
+- **`DATABASE_URL`** — required PostgreSQL connection string; Railway PostgreSQL can inject this automatically.
 - **`BETTER_AUTH_URL`** — optional; if unset, the app uses **`https://${RAILWAY_PUBLIC_DOMAIN}`** when Railway provides it (see **Public URL / Better Auth** above). Set explicitly for an override or when the system domain variable is unreliable.
 - **`NEXT_PUBLIC_APP_URL`** — optional Railway fallback (`https://…`) after **`RAILWAY_PUBLIC_DOMAIN`**; useful when the system variable is empty or must match Next’s public bundle.
 - **`BETTER_AUTH_ALLOWED_HOSTS`** — optional; comma-separated **host patterns** (wildcards allowed, e.g. `*.up.railway.app`) so sign-in works from **multiple or changing** public URLs without redeploying each time.
-- **`BETTER_AUTH_SECRET`** — optional on Railway; if unset, a secret is written once to `/data/.better-auth-secret` on the volume (persists across deploys). You can still set this variable explicitly or use `${{secret(...)}}` in a [published template](https://docs.railway.com/templates/create).
+- **`BETTER_AUTH_SECRET`** — required for production unless supplied by a template variable such as `${{secret(...)}}`.
 - **`SCRAPE_CRON`**, **`BETTER_AUTH_TRUSTED_ORIGINS`** — optional.
 
 Steps:
 
 1. Create a Railway project from this repo (or deploy a template based on it).
-2. Attach a **volume** at **`/data`** on the service.
+2. Add a **PostgreSQL** service and connect it to the app so **`DATABASE_URL`** is available.
 3. Turn on **public networking** and generate a Railway domain (or configure a custom domain).
-4. Set **`CONTEXT_DEV_API_KEY`** (and any optional managed settings above), then deploy.
+4. Set **`CONTEXT_DEV_API_KEY`**, **`BETTER_AUTH_SECRET`** (and any optional managed settings above), then deploy.
 
-Start runs `npm run db:migrate` (SQLite needs the mounted `/data` volume in the main app container), then the worker in the background and `next start` in the foreground. Health checks use `GET /api/health`.
+Start runs `npm run db:migrate`, then the worker in the background and `next start` in the foreground. Health checks use `GET /api/health`.
 
 **“Invalid origin” on sign-up / sign-in** usually means **`BETTER_AUTH_URL` / Railway’s public domain / `NEXT_PUBLIC_APP_URL`** are out of sync with the address bar. Prefer fixing public networking so **`RAILWAY_PUBLIC_DOMAIN`** is set; then **`NEXT_PUBLIC_APP_URL`** or **`BETTER_AUTH_URL`** if it stays blank. Or use **`BETTER_AUTH_ALLOWED_HOSTS`** for several hostnames (comma-separated patterns, no scheme), e.g. **`*.up.railway.app,myapp.com,www.myapp.com`**. For one-off extra origins, **`BETTER_AUTH_TRUSTED_ORIGINS`**. Do **not** leave **`BETTER_AUTH_URL=http://localhost:3000`** on a public Railway site.
 
@@ -123,8 +125,8 @@ Start runs `npm run db:migrate` (SQLite needs the mounted `/data` volume in the 
 
 | Variable | Example / notes |
 |----------|-----------------|
-| `DATABASE_URL` | `/data/webdog-ai.db` if not using the default above |
-| `BETTER_AUTH_SECRET` | Optional on Railway (volume file); required on Vercel / Netlify / Cloudflare |
+| `DATABASE_URL` | Required PostgreSQL URL, e.g. Railway PostgreSQL’s injected connection string |
+| `BETTER_AUTH_SECRET` | Required secret for cookie/session signing |
 | *(Railway system)* | **`RAILWAY_PUBLIC_DOMAIN`** — used automatically as `https://…` when **`BETTER_AUTH_URL`** is unset |
 | `NEXT_PUBLIC_APP_URL` | Optional; `https://…` fallback on Railway when the system public domain is missing / you want an explicit public URL in the client |
 | `BETTER_AUTH_URL` | Optional override; also the **fallback** when using **`BETTER_AUTH_ALLOWED_HOSTS`** |
@@ -135,13 +137,11 @@ Start runs `npm run db:migrate` (SQLite needs the mounted `/data` volume in the 
 | `POSTFIX_TO_ALERTS` | Optional text appended to new alert titles and outbound email subjects |
 | `MAX_ALERTS` | Optional active monitor limit per account |
 
-If `better-sqlite3` fails to compile on the builder, add a Dockerfile with build tools and set Railway’s builder to Dockerfile (see [Railway builds](https://docs.railway.com/builds)).
-
 ### Publishing your own Railway template
 
-Follow **[`railway/template-publish.md`](railway/template-publish.md)** for icons, naming, volume **`/data`**, health path **`/api/health`**, variable descriptions, and marketplace overview text aligned with Railway’s [template best practices](https://docs.railway.com/templates/best-practices).
+Follow **[`railway/template-publish.md`](railway/template-publish.md)** for icons, naming, PostgreSQL setup, health path **`/api/health`**, variable descriptions, and marketplace overview text aligned with Railway’s [template best practices](https://docs.railway.com/templates/best-practices).
 
-In the [template composer](https://docs.railway.com/templates/create): add this repo as the service source, attach a volume at **`/data`**, enable HTTP public networking, and add a **required** variable **`CONTEXT_DEV_API_KEY`** for deployers. Optional: expose **`RESEND_API_KEY`**, **`RESEND_SEND_FROM_EMAIL`**, **`MAX_ALERTS`**, and **`POSTFIX_TO_ALERTS`** for managed deployments, and add **`BETTER_AUTH_SECRET=${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=`** (see [template variable functions](https://docs.railway.com/templates/create#template-variable-functions)) instead of relying on the auto-generated volume secret. Copy the **template URL** Railway gives you into your README or site for one-click deploys.
+In the [template composer](https://docs.railway.com/templates/create): add this repo as the service source, add a PostgreSQL service, wire its connection string to **`DATABASE_URL`**, enable HTTP public networking, and add a **required** variable **`CONTEXT_DEV_API_KEY`** for deployers. Add **`BETTER_AUTH_SECRET=${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=`** (see [template variable functions](https://docs.railway.com/templates/create#template-variable-functions)). Optional: expose **`RESEND_API_KEY`**, **`RESEND_SEND_FROM_EMAIL`**, **`MAX_ALERTS`**, and **`POSTFIX_TO_ALERTS`** for managed deployments. Copy the **template URL** Railway gives you into your README or site for one-click deploys.
 
 ## Team invites (shared accounts)
 
