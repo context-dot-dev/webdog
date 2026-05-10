@@ -1,11 +1,10 @@
 /**
- * Minimal typed wrapper around the context.dev web-scraping API.
- * Docs: https://docs.context.dev/api-reference/web-scraping
+ * Typed wrapper around the context.dev TypeScript SDK.
+ * Docs: https://docs.context.dev/api-reference
  */
 
+import ContextDev, { APIError } from "context.dev";
 import { effectiveContextDevApiKey } from "./server-managed-config";
-
-const API_BASE = "https://api.context.dev/v1";
 
 export class ContextDevError extends Error {
   constructor(
@@ -31,68 +30,37 @@ function resolveApiKey(override?: string | null): string {
   );
 }
 
-async function request<T>(
-  pathname: string,
-  params: Record<string, string | number | boolean | undefined>,
-  bearerToken: string,
-): Promise<T> {
-  const url = new URL(`${API_BASE}${pathname}`);
-  for (const [k, v] of Object.entries(params)) {
-    if (v === undefined) continue;
-    url.searchParams.set(k, String(v));
-  }
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${bearerToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!res.ok) {
-    let message = `context.dev responded ${res.status}`;
-    let code: string | undefined;
-    try {
-      const body = (await res.json()) as {
-        message?: string;
-        error_code?: string;
-      };
-      if (body?.message) message = body.message;
-      code = body?.error_code;
-    } catch {
-      // ignore — non-JSON error body
-    }
-    throw new ContextDevError(message, res.status, code);
-  }
-
-  return (await res.json()) as T;
+function contextDevClient(apiKey?: string | null): ContextDev {
+  return new ContextDev({ apiKey: resolveApiKey(apiKey), maxRetries: 0 });
 }
 
-async function postRequest<T>(pathname: string, body: Record<string, unknown>, bearerToken: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${pathname}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${bearerToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+function sdkErrorCode(error: object | undefined): string | undefined {
+  if (!error) return undefined;
+  const body = error as { error_code?: unknown; code?: unknown };
+  if (typeof body.error_code === "string") return body.error_code;
+  if (typeof body.code === "string") return body.code;
+  return undefined;
+}
 
-  if (!res.ok) {
-    let message = `context.dev responded ${res.status}`;
-    let code: string | undefined;
-    try {
-      const errBody = (await res.json()) as { message?: string; error_code?: string };
-      if (errBody?.message) message = errBody.message;
-      code = errBody?.error_code;
-    } catch {
-      // non-JSON error body
-    }
-    throw new ContextDevError(message, res.status, code);
+function toContextDevError(err: unknown): ContextDevError {
+  if (err instanceof ContextDevError) return err;
+  if (err instanceof APIError) {
+    return new ContextDevError(
+      err.message || `context.dev responded ${err.status ?? 500}`,
+      err.status ?? 500,
+      sdkErrorCode(err.error),
+    );
   }
+  if (err instanceof Error) return new ContextDevError(err.message, 500);
+  return new ContextDevError("context.dev request failed", 500);
+}
 
-  return (await res.json()) as T;
+async function withContextDevErrors<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    throw toContextDevError(err);
+  }
 }
 
 /**
@@ -121,10 +89,27 @@ export async function extractProduct(
   options: ExtractProductOptions = {},
 ): Promise<ExtractProductResult> {
   const { apiKey, timeoutMS } = options;
-  const key = resolveApiKey(apiKey);
-  const body: Record<string, unknown> = { url };
-  if (timeoutMS !== undefined) body.timeoutMS = timeoutMS;
-  return postRequest<ExtractProductResult>("/brand/ai/product", body, key);
+  const result = await withContextDevErrors(() =>
+    contextDevClient(apiKey).ai.extractProduct({
+      url,
+      timeoutMS,
+      maxAgeMs: 0,
+    }),
+  );
+
+  return {
+    is_product_page: result.is_product_page ?? false,
+    platform: result.platform ?? null,
+    product: result.product
+      ? {
+          name: result.product.name,
+          description: result.product.description,
+          price: result.product.price ?? null,
+          currency: result.product.currency ?? null,
+          url: result.product.url ?? null,
+        }
+      : null,
+  };
 }
 
 export interface ScrapeMarkdownResult {
@@ -160,19 +145,16 @@ export async function scrapeMarkdown(
   url: string,
   options: ScrapeMarkdownOptions = {},
 ): Promise<ScrapeMarkdownResult> {
-  const { apiKey, maxAgeMs: _m, ...rest } = options;
-  const key = resolveApiKey(apiKey);
-  return request<ScrapeMarkdownResult>(
-    "/web/scrape/markdown",
-    {
+  const { apiKey, ...rest } = options;
+  return withContextDevErrors(() =>
+    contextDevClient(apiKey).web.webScrapeMd({
       url,
       includeLinks: rest.includeLinks,
       includeImages: rest.includeImages,
       shortenBase64Images: rest.shortenBase64Images,
       useMainContentOnly: rest.useMainContentOnly ?? true,
       maxAgeMs: 0,
-    },
-    key,
+    }),
   );
 }
 
@@ -188,15 +170,12 @@ export async function scrapeSitemap(
   options: ScrapeSitemapOptions = {},
 ): Promise<ScrapeSitemapResult> {
   const { apiKey, ...rest } = options;
-  const key = resolveApiKey(apiKey);
-  return request<ScrapeSitemapResult>(
-    "/web/scrape/sitemap",
-    {
+  return withContextDevErrors(() =>
+    contextDevClient(apiKey).web.webScrapeSitemap({
       domain,
       maxLinks: rest.maxLinks,
       urlRegex: rest.urlRegex,
-    },
-    key,
+    }),
   );
 }
 
@@ -226,22 +205,122 @@ export async function scrapeScreenshot(
   options: ScrapeScreenshotOptions = {},
 ): Promise<ScrapeScreenshotResult> {
   const { apiKey, domain, directUrl, fullScreenshot, prioritize } = options;
-  const key = resolveApiKey(apiKey);
   if (domain && directUrl) {
-    throw new ContextDevError("Pass either domain or directUrl, not both.", 400);
+    throw new ContextDevError(
+      "Pass either domain or directUrl, not both.",
+      400,
+    );
   }
   if (!domain && !directUrl) {
     throw new ContextDevError("Pass domain or directUrl for screenshot.", 400);
   }
-  return request<ScrapeScreenshotResult>(
-    "/web/screenshot",
-    {
-      domain: domain ?? undefined,
-      directUrl: directUrl ?? undefined,
-      fullScreenshot: fullScreenshot ? "true" : fullScreenshot === false ? "false" : undefined,
-      prioritize: prioritize,
-    },
-    key,
+
+  const query: ContextDev.WebScreenshotParams & {
+    prioritize?: "speed" | "quality";
+  } = {
+    domain: domain ?? undefined,
+    directUrl: directUrl ?? undefined,
+    fullScreenshot: fullScreenshot
+      ? "true"
+      : fullScreenshot === false
+        ? "false"
+        : undefined,
+    maxAgeMs: 0,
+    prioritize,
+  };
+  const result = await withContextDevErrors(() =>
+    contextDevClient(apiKey).web.screenshot(query),
+  );
+
+  return {
+    status: result.status ?? "ok",
+    domain: result.domain ?? domain ?? parseDomain(directUrl ?? ""),
+    screenshot: result.screenshot ?? "",
+    screenshotType:
+      result.screenshotType ?? (fullScreenshot ? "fullPage" : "viewport"),
+    code: result.code ?? 200,
+  };
+}
+
+type SdkBrand = NonNullable<
+  | ContextDev.BrandRetrieveResponse["brand"]
+  | ContextDev.BrandRetrieveByEmailResponse["brand"]
+>;
+
+function toBrandData(
+  brand: SdkBrand | undefined,
+  fallbackDomain?: string,
+): BrandData {
+  if (!brand) {
+    throw new ContextDevError(
+      "context.dev response did not include brand data",
+      502,
+    );
+  }
+
+  const colors = brand.colors?.map((color) => ({
+    hex: color.hex ?? "",
+    name: color.name,
+  }));
+  const logos = brand.logos?.map((logo) => ({
+    url: logo.url ?? "",
+    mode: logo.mode,
+    type: logo.type,
+    colors: logo.colors?.map((color) => ({
+      hex: color.hex ?? "",
+      name: color.name,
+    })),
+    resolution:
+      typeof logo.resolution?.width === "number" &&
+      typeof logo.resolution.height === "number" &&
+      typeof logo.resolution.aspect_ratio === "number"
+        ? {
+            width: logo.resolution.width,
+            height: logo.resolution.height,
+            aspect_ratio: logo.resolution.aspect_ratio,
+          }
+        : undefined,
+  }));
+  const backdrops = brand.backdrops?.map((backdrop) => ({
+    url: backdrop.url ?? "",
+    colors: backdrop.colors?.map((color) => ({
+      hex: color.hex ?? "",
+      name: color.name,
+    })),
+    resolution:
+      typeof backdrop.resolution?.width === "number" &&
+      typeof backdrop.resolution.height === "number" &&
+      typeof backdrop.resolution.aspect_ratio === "number"
+        ? {
+            width: backdrop.resolution.width,
+            height: backdrop.resolution.height,
+            aspect_ratio: backdrop.resolution.aspect_ratio,
+          }
+        : undefined,
+  }));
+
+  return {
+    domain: brand.domain ?? fallbackDomain ?? "",
+    title: brand.title,
+    description: brand.description,
+    slogan: brand.slogan,
+    logos,
+    backdrops,
+    colors,
+  };
+}
+
+function emailDomain(email: string): string | undefined {
+  const domain = email.trim().split("@")[1]?.trim().toLowerCase();
+  return domain || undefined;
+}
+
+function isFreeOrDisposableEmailError(err: unknown): boolean {
+  return (
+    err instanceof ContextDevError &&
+    err.status === 422 &&
+    (err.code === "FREE_EMAIL_DETECTED" ||
+      err.code === "DISPOSABLE_EMAIL_DETECTED")
   );
 }
 
@@ -294,25 +373,14 @@ export interface BrandData {
   colors?: BrandColor[];
 }
 
-interface RetrieveBrandResponse {
-  status: string;
-  code: number;
-  brand: BrandData;
-}
-
 export async function retrieveBrand(
   domain: string,
   options?: { apiKey?: string | null },
 ): Promise<BrandData> {
-  const key = resolveApiKey(options?.apiKey);
-  const res = await request<RetrieveBrandResponse>(
-    "/brand/retrieve",
-    {
-      domain,
-    },
-    key,
+  const res = await withContextDevErrors(() =>
+    contextDevClient(options?.apiKey).brand.retrieve({ domain, maxAgeMs: 0 }),
   );
-  return res.brand;
+  return toBrandData(res.brand, domain);
 }
 
 /**
@@ -323,54 +391,31 @@ export async function retrieveBrand(
 export async function tryRetrieveBrandByEmail(
   email: string,
   bearerToken: string,
-): Promise<{ outcome: "brand"; brand: BrandData } | { outcome: "free_or_disposable" }> {
+): Promise<
+  { outcome: "brand"; brand: BrandData } | { outcome: "free_or_disposable" }
+> {
   const key = bearerToken.trim();
   if (!key) {
     throw new ContextDevError("API key required", 400);
   }
 
-  const url = new URL(`${API_BASE}/brand/retrieve-by-email`);
-  url.searchParams.set("email", email.trim());
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (res.status === 422) {
-    let errorCode: string | undefined;
-    let message = `context.dev responded 422`;
-    try {
-      const body = (await res.json()) as { error_code?: string; message?: string };
-      errorCode = body?.error_code;
-      if (body?.message) message = body.message;
-    } catch {
-      /* non-JSON */
-    }
-    if (errorCode === "FREE_EMAIL_DETECTED" || errorCode === "DISPOSABLE_EMAIL_DETECTED") {
+  try {
+    const res = await withContextDevErrors(() =>
+      new ContextDev({ apiKey: key, maxRetries: 0 }).brand.retrieveByEmail({
+        email: email.trim(),
+        maxAgeMs: 0,
+      }),
+    );
+    return {
+      outcome: "brand",
+      brand: toBrandData(res.brand, emailDomain(email)),
+    };
+  } catch (err) {
+    if (isFreeOrDisposableEmailError(err)) {
       return { outcome: "free_or_disposable" };
     }
-    throw new ContextDevError(message, 422, errorCode);
+    throw err;
   }
-
-  if (!res.ok) {
-    let message = `context.dev responded ${res.status}`;
-    let code: string | undefined;
-    try {
-      const body = (await res.json()) as { message?: string; error_code?: string };
-      if (body?.message) message = body.message;
-      code = body?.error_code;
-    } catch {
-      /* ignore */
-    }
-    throw new ContextDevError(message, res.status, code);
-  }
-
-  const data = (await res.json()) as RetrieveBrandResponse;
-  return { outcome: "brand", brand: data.brand };
 }
 
 /** Confirms an API key is valid when retrieve-by-email is not usable (freemail/disposable inbox). */
@@ -408,21 +453,33 @@ export function pickBrandAssets(
   const logos = brand.logos ?? [];
   /** Dashboard avatar sits on neutral-950; dark / opaque logos read best there first. */
   const pickedLogo =
-    logos.find((l) => brandLogoHref(l) && l.type === "icon" && l.mode === "dark") ??
     logos.find(
-      (l) => brandLogoHref(l) && l.type === "icon" && l.mode === "has_opaque_background",
+      (l) => brandLogoHref(l) && l.type === "icon" && l.mode === "dark",
     ) ??
-    logos.find((l) => brandLogoHref(l) && l.type === "icon" && l.mode === "light") ??
-    logos.find((l) => brandLogoHref(l) && l.type === "icon" && l.mode !== "dark") ??
+    logos.find(
+      (l) =>
+        brandLogoHref(l) &&
+        l.type === "icon" &&
+        l.mode === "has_opaque_background",
+    ) ??
+    logos.find(
+      (l) => brandLogoHref(l) && l.type === "icon" && l.mode === "light",
+    ) ??
+    logos.find(
+      (l) => brandLogoHref(l) && l.type === "icon" && l.mode !== "dark",
+    ) ??
     logos.find((l) => brandLogoHref(l) && l.type === "icon") ??
     logos.find((l) => brandLogoHref(l) && l.mode !== "dark") ??
     logos.find((l) => brandLogoHref(l)) ??
     null;
   const backdrop =
-    (brand.backdrops ?? []).find((b) => sanitizeBrandAssetUrl(b.url)) ?? (brand.backdrops ?? [])[0] ?? null;
+    (brand.backdrops ?? []).find((b) => sanitizeBrandAssetUrl(b.url)) ??
+    (brand.backdrops ?? [])[0] ??
+    null;
   const backdropUrl = sanitizeBrandAssetUrl(backdrop?.url ?? null);
   let logoUrl = brandLogoHref(pickedLogo);
-  if (!logoUrl && options?.useBackdropWhenNoLogo && backdropUrl) logoUrl = backdropUrl;
+  if (!logoUrl && options?.useBackdropWhenNoLogo && backdropUrl)
+    logoUrl = backdropUrl;
   return {
     title: brand.title?.trim() || null,
     description: brand.description?.trim() || null,
@@ -449,7 +506,8 @@ export async function resolveAccountBrandLogoUrl(
 
   const byEmail = await tryRetrieveBrandByEmail(email, key);
   if (byEmail.outcome === "brand") {
-    return pickBrandAssets(byEmail.brand, { useBackdropWhenNoLogo: true }).logoUrl;
+    return pickBrandAssets(byEmail.brand, { useBackdropWhenNoLogo: true })
+      .logoUrl;
   }
   await smokeVerifyContextApiKey(key);
   return null;
