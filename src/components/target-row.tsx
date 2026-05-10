@@ -3,23 +3,29 @@
 import { Fragment, useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LinkScope, NotificationChannel, Target } from "@/lib/db/schema";
-import type { TargetChangeDetail, TargetFetchEntry } from "@/lib/target-fetch-history";
+import type {
+  TargetChangeDetail,
+  TargetFetchEntry,
+} from "@/lib/target-fetch-history";
 import { KindBadge } from "./target-kind";
 import { RelativeTime } from "./relative-time";
 import type { WebsiteDestOption } from "./website-notification-destinations";
-import {
-  TARGET_FORM_DASHBOARD_ONLY,
-  TARGET_FORM_WEBSITE_DEFAULT,
-} from "@/lib/website-notification-destinations";
+import { TARGET_FORM_DASHBOARD_ONLY } from "@/lib/website-notification-destinations";
 import { DiffPreview, LinksBlock, PriceChangeDetails } from "./alert-item";
 import { ProductPriceHistoryPanel } from "./product-price-history-panel";
 import { RunNowButton } from "./run-now-button";
 import type { ProductPricePoint } from "@/lib/product-price-history";
 import { formatProductPrice } from "@/lib/product-price-history";
-import { CHECK_FREQUENCY_PRESET_HOURS, checkFrequencyLabel } from "@/lib/check-frequency-presets";
+import {
+  CHECK_FREQUENCY_PRESET_HOURS,
+  checkFrequencyLabel,
+} from "@/lib/check-frequency-presets";
 
 /** Full URL for the link; label is path+query+hash when same host as the website, else the full URL. */
-function targetUrlPresentation(websiteUrl: string, pageUrl: string | null): { href: string; label: string } {
+function targetUrlPresentation(
+  websiteUrl: string,
+  pageUrl: string | null,
+): { href: string; label: string } {
   const href = (pageUrl?.trim() || websiteUrl).trim();
   try {
     const u = new URL(href);
@@ -54,7 +60,7 @@ function coerceLinkScope(v: string | null | undefined): LinkScope {
 
 function deriveOutboundRouting(target: Target): string {
   if (!(target.externalNotify ?? true)) return TARGET_FORM_DASHBOARD_ONLY;
-  return target.notificationDestinationId ?? TARGET_FORM_WEBSITE_DEFAULT;
+  return target.notificationDestinationId ?? TARGET_FORM_DASHBOARD_ONLY;
 }
 
 function FetchChangeDetailView({ detail }: { detail: TargetChangeDetail }) {
@@ -68,10 +74,16 @@ function FetchChangeDetailView({ detail }: { detail: TargetChangeDetail }) {
   if (detail.kind === "sitemap") {
     return (
       <div className="space-y-3">
-        {detail.added.length > 0 && <LinksBlock title="Added" tone="emerald" urls={detail.added} />}
-        {detail.removed.length > 0 && <LinksBlock title="Removed" tone="rose" urls={detail.removed} />}
+        {detail.added.length > 0 && (
+          <LinksBlock title="Added" tone="emerald" urls={detail.added} />
+        )}
+        {detail.removed.length > 0 && (
+          <LinksBlock title="Removed" tone="rose" urls={detail.removed} />
+        )}
         {detail.added.length === 0 && detail.removed.length === 0 && (
-          <p className="text-xs text-neutral-500">Sitemap hash changed without URL set diff (e.g. ordering).</p>
+          <p className="text-xs text-neutral-500">
+            Sitemap hash changed without URL set diff (e.g. ordering).
+          </p>
         )}
       </div>
     );
@@ -90,7 +102,9 @@ function FetchChangeDetailView({ detail }: { detail: TargetChangeDetail }) {
   }
   return (
     <div className="space-y-2 text-xs">
-      <p className="text-neutral-600">Product snapshot changed (extraction or page type differs).</p>
+      <p className="text-neutral-600">
+        Product snapshot changed (extraction or page type differs).
+      </p>
       <div className="grid gap-2 sm:grid-cols-2">
         <pre className="max-h-48 overflow-auto rounded-lg bg-neutral-100 p-2 font-mono text-[0.7rem] leading-relaxed">
           {JSON.stringify(before, null, 2)}
@@ -140,17 +154,29 @@ export function TargetRow({
   const router = useRouter();
   const detailsId = useId();
   const [enabled, setEnabled] = useState(target.enabled);
-  const [checkIntervalHours, setCheckIntervalHours] = useState(target.checkIntervalHours ?? 1);
-  const [outboundRouting, setOutboundRouting] = useState(() => deriveOutboundRouting(target));
-  const [linkScope, setLinkScope] = useState<LinkScope>(() => coerceLinkScope(target.linkScope));
+  const [checkIntervalHours, setCheckIntervalHours] = useState(
+    target.checkIntervalHours ?? 1,
+  );
+  const [outboundRouting, setOutboundRouting] = useState(() =>
+    deriveOutboundRouting(target),
+  );
+  const [linkScope, setLinkScope] = useState<LinkScope>(() =>
+    coerceLinkScope(target.linkScope),
+  );
   const [busy, setBusy] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [expandedFetchId, setExpandedFetchId] = useState<string | null>(null);
   const showPriceCol = target.kind === "PRODUCT_PRICE";
-  const { href: targetHref, label: targetLabel } = targetUrlPresentation(websiteUrl, target.pageUrl);
+  const { href: targetHref, label: targetLabel } = targetUrlPresentation(
+    websiteUrl,
+    target.pageUrl,
+  );
 
   const hourOptions = (() => {
-    const set = new Set<number>([...CHECK_FREQUENCY_PRESET_HOURS, checkIntervalHours]);
+    const set = new Set<number>([
+      ...CHECK_FREQUENCY_PRESET_HOURS,
+      checkIntervalHours,
+    ]);
     return Array.from(set).sort((a, b) => a - b);
   })();
 
@@ -223,9 +249,7 @@ export function TargetRow({
     const body =
       nextSel === TARGET_FORM_DASHBOARD_ONLY
         ? { externalNotify: false, notificationDestinationId: null }
-        : nextSel === TARGET_FORM_WEBSITE_DEFAULT
-          ? { externalNotify: true, notificationDestinationId: null }
-          : { externalNotify: true, notificationDestinationId: nextSel };
+        : { externalNotify: true, notificationDestinationId: nextSel };
     const res = await fetch(`/api/targets/${target.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -255,7 +279,8 @@ export function TargetRow({
           <div className="shrink-0 text-xs text-neutral-500 sm:ml-0">
             {target.lastCheckedAt ? (
               <>
-                Last checked <RelativeTime date={new Date(Number(target.lastCheckedAt))} />
+                Last checked{" "}
+                <RelativeTime date={new Date(Number(target.lastCheckedAt))} />
               </>
             ) : (
               <>Waiting for first check</>
@@ -268,7 +293,9 @@ export function TargetRow({
             <span className="sr-only">Enabled</span>
             <span
               className={`group relative inline-flex w-9 shrink-0 rounded-full p-0.5 ring-1 ring-inset transition-colors ${
-                enabled ? "bg-brand-500 ring-brand-500" : "bg-neutral-200 ring-neutral-950/5"
+                enabled
+                  ? "bg-brand-500 ring-brand-500"
+                  : "bg-neutral-200 ring-neutral-950/5"
               } ${busy ? "opacity-60" : ""}`}
             >
               <span
@@ -309,22 +336,29 @@ export function TargetRow({
           {target.pageUrl && (
             <p className="text-xs text-neutral-600">
               <span className="font-medium text-neutral-800">Watched page</span>{" "}
-              <span className="font-mono text-neutral-600">{target.pageUrl}</span>
+              <span className="font-mono text-neutral-600">
+                {target.pageUrl}
+              </span>
             </p>
           )}
           {target.kind === "SITEMAP_LINKS" && (
             <>
               <p className="text-xs text-neutral-600">
-                <span className="font-medium text-neutral-800">Monitors</span> the site sitemap URL list; one scrape
-                per check covers additions and removals.
+                <span className="font-medium text-neutral-800">Monitors</span>{" "}
+                the site sitemap URL list; one scrape per check covers additions
+                and removals.
               </p>
               <label className="flex max-w-md flex-col gap-0.5 text-xs text-neutral-600">
-                <span className="font-medium text-neutral-800">Notify when</span>
+                <span className="font-medium text-neutral-800">
+                  Notify when
+                </span>
                 <select
                   className="w-full rounded-lg border border-neutral-950/10 bg-white px-2 py-1.5 text-xs text-neutral-800 shadow-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                   value={linkScope}
                   disabled={busy}
-                  onChange={(e) => void setLinkScopePreference(e.target.value as LinkScope)}
+                  onChange={(e) =>
+                    void setLinkScopePreference(e.target.value as LinkScope)
+                  }
                   aria-label="Which sitemap changes trigger alerts"
                 >
                   {LINK_SCOPE_OPTIONS.map((o) => (
@@ -339,7 +373,10 @@ export function TargetRow({
 
           {target.kind === "PRODUCT_PRICE" && (
             <div className="mt-1">
-              <ProductPriceHistoryPanel points={productPriceHistory} pageUrl={target.pageUrl} />
+              <ProductPriceHistoryPanel
+                points={productPriceHistory}
+                pageUrl={target.pageUrl}
+              />
             </div>
           )}
 
@@ -350,11 +387,14 @@ export function TargetRow({
                 className="w-full max-w-md rounded-lg border border-neutral-950/10 bg-white px-2 py-1.5 text-xs text-neutral-800 shadow-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                 value={outboundRouting}
                 disabled={busy}
-                onChange={(e) => void setOutboundRoutingPreference(e.target.value)}
+                onChange={(e) =>
+                  void setOutboundRoutingPreference(e.target.value)
+                }
                 aria-label="Where alerts go for this target"
               >
-                <option value={TARGET_FORM_DASHBOARD_ONLY}>None (dashboard only)</option>
-                <option value={TARGET_FORM_WEBSITE_DEFAULT}>Website default routing</option>
+                <option value={TARGET_FORM_DASHBOARD_ONLY}>
+                  None (dashboard only)
+                </option>
                 {destinations.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name} ({channelLabel(d.channel)})
@@ -382,13 +422,17 @@ export function TargetRow({
           </div>
 
           <div>
-            <h3 className="text-xs font-medium text-neutral-800">Fetch history</h3>
+            <h3 className="text-xs font-medium text-neutral-800">
+              Fetch history
+            </h3>
             <p className="mt-0.5 text-xs text-neutral-500">
-              Stored results for this target (newest first). “vs previous” compares each fetch to the one before it in
-              time.
+              Stored results for this target (newest first). “vs previous”
+              compares each fetch to the one before it in time.
             </p>
             {fetchHistory.length === 0 ? (
-              <p className="mt-3 text-sm text-neutral-600">No fetches stored for this target yet.</p>
+              <p className="mt-3 text-sm text-neutral-600">
+                No fetches stored for this target yet.
+              </p>
             ) : (
               <div className="mt-3 overflow-x-auto rounded-xl ring-1 ring-neutral-950/10">
                 <table
@@ -404,7 +448,10 @@ export function TargetRow({
                           Price
                         </th>
                       )}
-                      <th className="whitespace-nowrap px-2 py-2 font-mono text-xs" scope="col">
+                      <th
+                        className="whitespace-nowrap px-2 py-2 font-mono text-xs"
+                        scope="col"
+                      >
                         Hash
                       </th>
                       <th className="px-2 py-2" scope="col">
@@ -428,7 +475,10 @@ export function TargetRow({
                               <td className="whitespace-nowrap px-2 py-2 align-top text-xs text-neutral-900">
                                 {r.productRow?.isProductPage ? (
                                   <span className="tabular-nums font-medium">
-                                    {formatProductPrice(r.productRow.price, r.productRow.currency)}
+                                    {formatProductPrice(
+                                      r.productRow.price,
+                                      r.productRow.currency,
+                                    )}
                                   </span>
                                 ) : (
                                   <span className="text-neutral-400">—</span>
@@ -440,32 +490,51 @@ export function TargetRow({
                             </td>
                             <td className="px-2 py-2 align-top text-xs">
                               {r.changedFromPrevious === null ? (
-                                <span className="text-neutral-400">First in list</span>
+                                <span className="text-neutral-400">
+                                  First in list
+                                </span>
                               ) : r.changedFromPrevious ? (
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className="text-amber-800">Changed</span>
+                                  <span className="text-amber-800">
+                                    Changed
+                                  </span>
                                   {r.changeDetail && (
                                     <button
                                       type="button"
                                       className="btn-ghost px-2 py-1 text-xs"
                                       onClick={() =>
-                                        setExpandedFetchId((id) => (id === r.id ? null : r.id))
+                                        setExpandedFetchId((id) =>
+                                          id === r.id ? null : r.id,
+                                        )
                                       }
-                                      aria-expanded={expandedFetchId === r.id ? "true" : "false"}
+                                      aria-expanded={
+                                        expandedFetchId === r.id
+                                          ? "true"
+                                          : "false"
+                                      }
                                     >
-                                      {expandedFetchId === r.id ? "Hide" : "Show"}
+                                      {expandedFetchId === r.id
+                                        ? "Hide"
+                                        : "Show"}
                                     </button>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-neutral-600">No change</span>
+                                <span className="text-neutral-600">
+                                  No change
+                                </span>
                               )}
                             </td>
                           </tr>
                           {expandedFetchId === r.id && r.changeDetail && (
                             <tr className="border-b border-neutral-950/5 bg-neutral-50/80 last:border-b-0">
-                              <td colSpan={showPriceCol ? 4 : 3} className="px-3 py-3">
-                                <FetchChangeDetailView detail={r.changeDetail} />
+                              <td
+                                colSpan={showPriceCol ? 4 : 3}
+                                className="px-3 py-3"
+                              >
+                                <FetchChangeDetailView
+                                  detail={r.changeDetail}
+                                />
                               </td>
                             </tr>
                           )}

@@ -171,7 +171,7 @@ export const target = sqliteTable(
     lastCheckedAt: integer("lastCheckedAt", { mode: "timestamp_ms" }),
     /**
      * When false, alerts are stored only in-app — no Slack/email/webhook for this target.
-     * When true, `notificationDestinationId` selects a destination, or null means website-level routing.
+     * When true, `notificationDestinationId` selects the target's external destination.
      */
     externalNotify: integer("externalNotify", { mode: "boolean" }).notNull().default(true),
     notificationDestinationId: text("notificationDestinationId").references(

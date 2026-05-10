@@ -125,9 +125,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         updates.externalNotify = true;
       } else {
         updates.notificationDestinationId = null;
-        updates.externalNotify = true;
+        updates.externalNotify = false;
       }
     } else if (extPart === true) {
+      if (!owned.target.notificationDestinationId) {
+        return badRequest("Select a notification destination before enabling external alerts.");
+      }
       updates.externalNotify = true;
     }
   }

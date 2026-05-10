@@ -418,7 +418,7 @@ export async function runWebsiteChecks(
     for (const a of alerts) {
       const tgt = targetById.get(a.targetId);
       if (!tgt) continue;
-      const dests = resolveDestinationsForTarget(tgt, userDestinations, website.notificationDestinationIds);
+      const dests = resolveDestinationsForTarget(tgt, userDestinations);
       let parsedDetails: { diffPreview?: string; totalAdded?: number; totalRemoved?: number } = {};
       try {
         parsedDetails = JSON.parse(a.details) as typeof parsedDetails;

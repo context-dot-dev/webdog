@@ -13,11 +13,10 @@ export type UserDestinationRow = {
   alertWebhookUrl: string | null;
 };
 
-/** Per-target routing: explicit destination wins; otherwise website-level list / “all”. */
+/** Per-target routing: only explicit destinations notify externally. */
 export function resolveDestinationsForTarget(
   target: Pick<Target, "notificationDestinationId" | "externalNotify">,
   userDestinations: UserDestinationRow[],
-  websiteNotificationIdsJson: string | null | undefined,
 ): UserDestinationRow[] {
   if (!(target.externalNotify ?? true)) return [];
   const tid = target.notificationDestinationId?.trim();
@@ -25,7 +24,7 @@ export function resolveDestinationsForTarget(
     const one = userDestinations.find((d) => d.id === tid);
     return one ? [one] : [];
   }
-  return filterDestinationsForWebsite(userDestinations, websiteNotificationIdsJson);
+  return [];
 }
 
 export function parseWebsiteNotificationDestinationIds(raw: string | null | undefined): string[] | null {
@@ -57,5 +56,3 @@ export function filterDestinationsForWebsite<T extends { id: string }>(
 
 /** `<select>` value for routing alerts in-app only (no Slack/email/webhook). */
 export const TARGET_FORM_DASHBOARD_ONLY = "__tgt_dashboard_only";
-/** `<select>` value for website-wide destination routing (`notificationDestinationId` null). */
-export const TARGET_FORM_WEBSITE_DEFAULT = "__tgt_website_default";

@@ -85,9 +85,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (wantOutbound) {
     destId = await resolveNotificationDestinationId(ownerId, parsed.data.notificationDestinationId);
     if (!destId) {
-      return badRequest(
-        "Select a notification destination, or add exactly one in Settings to use it by default.",
-      );
+      return badRequest("Select a notification destination, or choose dashboard-only alerts.");
     }
   }
 
