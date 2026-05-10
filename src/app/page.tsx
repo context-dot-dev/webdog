@@ -79,7 +79,7 @@ export default async function LandingPage() {
             Get started
           </Link>
           <a
-            href="https://github.com"
+            href="https://github.com/context-dot-dev/webdog"
             className="rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-neutral-900 ring-1 ring-neutral-900/10 transition hover:bg-neutral-50"
             target="_blank"
             rel="noreferrer noopener"
