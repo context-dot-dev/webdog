@@ -5,43 +5,56 @@
   "private": true,
   "description": "Open-source website change monitoring — scrape, diff, notify.",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.9"
   },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "typecheck": "tsc --noEmit --incremental false",
     "worker": "tsx scripts/worker.ts",
     "worker:once": "tsx scripts/worker.ts --once",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:check": "tsx scripts/check-db.ts",
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:reset": "tsx scripts/reset-db.ts && drizzle-kit push",
-    "lint": "next lint"
+    "lint": "eslint src scripts drizzle.config.ts next.config.ts tailwind.config.ts eslint.config.mjs"
   },
   "dependencies": {
-    "better-auth": "^1.2.7",
+    "better-auth": "^1.6.11",
     "context.dev": "^1.18.0",
     "dotenv": "^16.4.7",
     "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.45.2",
-    "next": "^15.1.11",
-    "node-cron": "^3.0.3",
+    "next": "^15.5.18",
+    "node-cron": "^4.2.1",
     "pg": "^8.20.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "tsx": "^4.19.2",
+    "tsx": "^4.22.3",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.20.0",
     "@types/react": "19.0.3",
     "@types/react-dom": "19.0.2",
     "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^15.5.18",
     "postcss": "^8.5.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    },
+    "next": {
+      "postcss": "8.5.10"
+    }
   }
 }

@@ -1,7 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { INVITE_EXPIRY_MS } from "./invite-constants";
-
 export function generateInviteRawToken(): string {
   return randomBytes(32).toString("base64url");
 }

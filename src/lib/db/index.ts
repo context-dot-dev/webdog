@@ -10,7 +10,6 @@ type Connection = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
   var webdogPgConnection: Connection | undefined;
 }
 

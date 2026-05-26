@@ -4,17 +4,18 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
 
 ## Requirements
 
-- **Node.js** 20+ (recommended; matches Next.js 15)
+- **Node.js** 20.9+ (matches the Next.js runtime requirement)
 - **npm** (or your preferred package manager)
-- **PostgreSQL** 14+ for local development or a managed PostgreSQL service in production
+- **Docker** with Docker Compose for the easiest local PostgreSQL setup
+- **PostgreSQL** 14+ if you prefer running your own local or managed database
 
 ## Setup
 
 1. **Clone and install dependencies**
 
    ```bash
-   git clone <your-repo-url>
-   cd webdog-ai
+   git clone https://github.com/context-dot-dev/website-watchdog.git
+   cd website-watchdog
    npm install
    ```
 
@@ -26,17 +27,37 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
    cp .env.example .env
    ```
 
-   At minimum for local development, set **`DATABASE_URL`** to your PostgreSQL connection string and set **`BETTER_AUTH_SECRET`** to a long random string (for example: `openssl rand -base64 32`). Other keys in `.env.example` are documented there.
+   For local development, the checked-in Docker Compose file matches the default **`DATABASE_URL`** in `.env.example`. Set **`BETTER_AUTH_SECRET`** to a long random string if you want realistic auth cookies:
 
-3. **Create the database schema**
+   ```bash
+   openssl rand -base64 32
+   ```
 
-   The app uses **PostgreSQL** with [Drizzle](https://orm.drizzle.team/). Apply the schema (creates auth tables, websites, targets, and so on):
+   Optional service keys such as **`CONTEXT_DEV_API_KEY`**, **`RESEND_API_KEY`**, and **`RESEND_SEND_FROM_EMAIL`** are documented in `.env.example`.
+
+3. **Start PostgreSQL and create the schema**
+
+   Start the local Postgres container:
+
+   ```bash
+   npm run db:up
+   ```
+
+   If port `5432` is already in use, set both values in `.env` before starting Postgres:
+
+   ```bash
+   POSTGRES_PORT=5433
+   DATABASE_URL=postgres://postgres:postgres@localhost:5433/webdog_ai
+   ```
+
+   Apply the Drizzle schema and verify connectivity:
 
    ```bash
    npm run db:push
+   npm run db:check
    ```
 
-   Without this step, the API will error with `relation "user" does not exist` (or similar) and sign-in / sign-up will not work.
+   Without the schema step, the API will error with `relation "user" does not exist` (or similar) and sign-in / sign-up will not work.
 
 4. **Run the app**
 
@@ -46,14 +67,45 @@ Open-source website change monitoring: scrape pages, diff over time, and get not
 
    Open [http://localhost:3000](http://localhost:3000) and create an account. If you use `http://127.0.0.1:3000` instead of `localhost`, ensure `BETTER_AUTH_URL` matches how you open the app, or add extra origins via `BETTER_AUTH_TRUSTED_ORIGINS` in `.env` (see [Better Auth](https://www.better-auth.com/docs) and `.env.example`).
 
+5. **Run the worker**
+
+   Scrapes are performed by a separate worker process. Run it in another terminal during local development:
+
+   ```bash
+   npm run worker
+   ```
+
+   To verify the worker path once without leaving it running:
+
+   ```bash
+   npm run worker:once
+   ```
+
+## Verification
+
+Before opening a pull request, run:
+
+```bash
+npm run db:check
+npm run typecheck
+npm run lint
+npm run build
+npm audit --omit=dev
+```
+
 ## Other scripts
 
 | Command            | Description                                      |
 | ------------------ | ------------------------------------------------ |
 | `npm run build`    | Production build                                 |
 | `npm run start`    | Start production server (after `build`)         |
+| `npm run typecheck` | Run TypeScript without emitting files           |
+| `npm run lint`     | Run ESLint against source, scripts, and config files |
 | `npm run worker`   | Long-running worker that runs scrapes on a schedule |
 | `npm run worker:once` | Run the worker once and exit                 |
+| `npm run db:up` | Start local PostgreSQL with Docker Compose |
+| `npm run db:down` | Stop the local Docker Compose services |
+| `npm run db:check` | Verify PostgreSQL connectivity and expected tables |
 | `npm run db:push` | Push the current schema to the configured PostgreSQL database |
 | `npm run db:reset` | Drop/recreate the configured PostgreSQL `public` schema, then push the current schema |
 | `npm run db:generate` | Generate SQL migration files from the schema  |

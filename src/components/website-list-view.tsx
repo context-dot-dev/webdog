@@ -45,7 +45,6 @@ function WebsiteLogoAvatar({
   return (
     <div className={`${frame} ${className}`}>
       {logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={logoUrl}
           alt=""
@@ -177,7 +176,6 @@ function GridView({ websites }: { websites: Website[] }) {
               {w.heroScreenshotUrl || w.backdropUrl ? (
                 <div className="absolute inset-0 z-0">
                   <div className="size-full overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={w.heroScreenshotUrl ?? w.backdropUrl ?? ""}
                       alt=""

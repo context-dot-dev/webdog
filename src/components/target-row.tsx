@@ -185,13 +185,7 @@ export function TargetRow({
     setCheckIntervalHours(target.checkIntervalHours ?? 1);
     setOutboundRouting(deriveOutboundRouting(target));
     setLinkScope(coerceLinkScope(target.linkScope));
-  }, [
-    target.enabled,
-    target.checkIntervalHours,
-    target.notificationDestinationId,
-    target.externalNotify,
-    target.linkScope,
-  ]);
+  }, [target]);
 
   async function toggle() {
     setBusy(true);

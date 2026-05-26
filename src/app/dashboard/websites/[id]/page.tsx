@@ -91,7 +91,6 @@ export default async function WebsiteDetailPage({
       <header className="overflow-hidden rounded-2xl bg-white shadow-xs ring-1 ring-neutral-950/5">
         <div className="relative h-40 bg-neutral-100 sm:h-48">
           {website.heroScreenshotUrl || website.backdropUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={website.heroScreenshotUrl ?? website.backdropUrl ?? ""}
               alt=""
@@ -107,7 +106,6 @@ export default async function WebsiteDetailPage({
           <div className="-mt-10 flex flex-wrap items-end justify-between gap-4">
             <div className="flex size-20 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-xs ring-1 ring-neutral-950/10">
               {website.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={website.logoUrl} alt="" className="size-14 object-contain" />
               ) : (
                 <span className="font-mono text-2xl font-semibold text-brand-700">
