@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Alert } from "@/lib/db/schema";
 import { KindBadge } from "./target-kind";
+import { parseTimestamp } from "@/lib/parse-timestamp";
 import { RelativeTime } from "./relative-time";
 
 interface AlertDetails {
@@ -127,7 +128,7 @@ export function AlertItem({
         <KindBadge kind={alert.kind} compact />
         <p className="min-w-0 flex-1 truncate text-sm text-neutral-900">{alertTitleForDisplay(alert.title)}</p>
         <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-neutral-500">
-          <RelativeTime date={new Date(Number(alert.createdAt))} />
+          <RelativeTime date={parseTimestamp(alert.createdAt)} />
         </span>
         <button
           type="button"

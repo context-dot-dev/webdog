@@ -10,6 +10,7 @@ import { TargetRow } from "@/components/target-row";
 import { AlertItem } from "@/components/alert-item";
 import { RunNowButton } from "@/components/run-now-button";
 import { DeleteWebsiteButton } from "@/components/delete-website-button";
+import { parseTimestamp } from "@/lib/parse-timestamp";
 import { RelativeTime } from "@/components/relative-time";
 import { ExpandableText } from "@/components/expandable-text";
 import { buildProductPriceSeries } from "@/lib/product-price-history";
@@ -192,7 +193,7 @@ export default async function WebsiteDetailPage({
               The most recent alerts for this website.{" "}
               {alerts[0] && (
                 <>
-                  Last change <RelativeTime date={new Date(Number(alerts[0].createdAt))} />.
+                  Last change <RelativeTime date={parseTimestamp(alerts[0].createdAt)} />.
                 </>
               )}
             </p>
@@ -266,9 +267,7 @@ export default async function WebsiteDetailPage({
                         className="border-b border-neutral-950/5 last:border-b-0"
                       >
                         <td className="whitespace-nowrap px-4 py-2.5 align-top text-xs text-neutral-600 sm:pl-5">
-                          <time dateTime={new Date(+s.createdAt).toISOString()}>
-                            <RelativeTime date={new Date(+s.createdAt)} />
-                          </time>
+                          <RelativeTime date={parseTimestamp(s.createdAt)} />
                         </td>
                         <td className="px-2 py-2.5 align-top font-mono text-xs text-neutral-800">{s.kind}</td>
                         <td className="max-w-0 py-2.5 align-top">

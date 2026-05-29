@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AddWebsiteDialog } from "@/components/add-website-dialog";
 import { RelativeTime } from "@/components/relative-time";
+import { parseTimestamp } from "@/lib/parse-timestamp";
 import { APP_NAME } from "@/lib/product-info";
 
 type Website = {
@@ -225,7 +226,7 @@ function GridView({ websites }: { websites: Website[] }) {
                   label="Last check"
                   value={
                     w.lastCheckedAt ? (
-                      <RelativeTime date={new Date(Number(w.lastCheckedAt))} />
+                      <RelativeTime date={parseTimestamp(w.lastCheckedAt)} />
                     ) : (
                       "never"
                     )
@@ -278,7 +279,7 @@ function ListView({ websites }: { websites: Website[] }) {
                 <dt className="text-xs text-neutral-500">Last check</dt>
                 <dd className="tabular-nums text-sm font-medium text-neutral-900">
                   {w.lastCheckedAt ? (
-                    <RelativeTime date={new Date(Number(w.lastCheckedAt))} />
+                    <RelativeTime date={parseTimestamp(w.lastCheckedAt)} />
                   ) : (
                     "never"
                   )}

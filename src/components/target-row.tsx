@@ -8,6 +8,7 @@ import type {
   TargetFetchEntry,
 } from "@/lib/target-fetch-history";
 import { KindBadge } from "./target-kind";
+import { parseTimestamp } from "@/lib/parse-timestamp";
 import { RelativeTime } from "./relative-time";
 import type { WebsiteDestOption } from "./website-notification-destinations";
 import { TARGET_FORM_DASHBOARD_ONLY } from "@/lib/website-notification-destinations";
@@ -274,7 +275,7 @@ export function TargetRow({
             {target.lastCheckedAt ? (
               <>
                 Last checked{" "}
-                <RelativeTime date={new Date(Number(target.lastCheckedAt))} />
+                <RelativeTime date={parseTimestamp(target.lastCheckedAt)} />
               </>
             ) : (
               <>Waiting for first check</>
@@ -454,16 +455,11 @@ export function TargetRow({
                     </tr>
                   </thead>
                   <tbody>
-                    {fetchHistory.map((r) => {
-                      const t = r.createdAt;
-                      const d = new Date(t);
-                      return (
+                    {fetchHistory.map((r) => (
                         <Fragment key={r.id}>
                           <tr className="border-b border-neutral-950/5 bg-white/60 last:border-b-0">
                             <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-neutral-600">
-                              <time dateTime={d.toISOString()}>
-                                <RelativeTime date={d} />
-                              </time>
+                              <RelativeTime date={r.createdAt} />
                             </td>
                             {showPriceCol && (
                               <td className="whitespace-nowrap px-2 py-2 align-top text-xs text-neutral-900">
@@ -533,8 +529,7 @@ export function TargetRow({
                             </tr>
                           )}
                         </Fragment>
-                      );
-                    })}
+                    ))}
                   </tbody>
                 </table>
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { parseTimestamp } from "@/lib/parse-timestamp";
 
 function fmt(d: Date): string {
   const diff = Date.now() - d.getTime();
@@ -15,15 +16,22 @@ function fmt(d: Date): string {
   return d.toLocaleDateString();
 }
 
-export function RelativeTime({ date }: { date: Date }) {
-  const [label, setLabel] = useState(() => fmt(date));
+export function RelativeTime({ date }: { date: Date | string | number }) {
+  const parsed = parseTimestamp(date);
+  const valid = !Number.isNaN(parsed.getTime());
+  const [label, setLabel] = useState(() => (valid ? fmt(parsed) : "—"));
   useEffect(() => {
-    setLabel(fmt(date));
-    const id = setInterval(() => setLabel(fmt(date)), 30_000);
+    if (!valid) return;
+    const d = parseTimestamp(date);
+    setLabel(fmt(d));
+    const id = setInterval(() => setLabel(fmt(d)), 30_000);
     return () => clearInterval(id);
-  }, [date]);
+  }, [date, valid]);
+  if (!valid) {
+    return <time>—</time>;
+  }
   return (
-    <time dateTime={date.toISOString()} title={date.toLocaleString()}>
+    <time dateTime={parsed.toISOString()} title={parsed.toLocaleString()}>
       {label}
     </time>
   );
