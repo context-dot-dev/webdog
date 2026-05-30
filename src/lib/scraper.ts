@@ -15,6 +15,13 @@ import { resolveDestinationsForTarget } from "./website-notification-destination
 import { authPublicBaseUrl } from "./auth";
 import { buildNewAlertsPayload, type NewAlertsAlert } from "./notification-new-alerts";
 import { appendAlertPostfix } from "./server-managed-config";
+import { diffPreview } from "./diff-preview";
+import {
+  mergeAlertDetails,
+  resolveAiSummaryConfig,
+  trySummarizeAlert,
+  type AlertDetailsForSummary,
+} from "./ai-change-summary";
 
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
@@ -38,24 +45,7 @@ async function latestSnapshot(websiteId: string, kind: SnapshotKind, targetUrl: 
   return rows[0] ?? null;
 }
 
-export function diffPreview(
-  before: string,
-  after: string,
-  ctxLines = 3,
-): { preview: string; totalAdded: number; totalRemoved: number } {
-  const a = before.split("\n");
-  const b = after.split("\n");
-  const setA = new Set(a);
-  const setB = new Set(b);
-  const added = b.filter((l) => !setA.has(l));
-  const removed = a.filter((l) => !setB.has(l));
-  const limit = (arr: string[]) =>
-    arr.slice(0, ctxLines).map((l) => (l.length > 160 ? l.slice(0, 157) + "…" : l));
-  const parts: string[] = [];
-  if (added.length) parts.push(`+ ${limit(added).join("\n+ ")}`);
-  if (removed.length) parts.push(`- ${limit(removed).join("\n- ")}`);
-  return { preview: parts.join("\n"), totalAdded: added.length, totalRemoved: removed.length };
-}
+export { diffPreview } from "./diff-preview";
 
 interface ProductSnapshotData {
   is_product_page: boolean;
@@ -105,6 +95,8 @@ interface AlertInsert {
   title: string;
   details: string;
   createdAt: Date;
+  /** Extra context for LLM summary; not persisted to alert.details. */
+  summaryDetails?: AlertDetailsForSummary;
 }
 
 function linkScopeEmits(scope: string | null | undefined, variant: "new" | "removed"): boolean {
@@ -180,6 +172,14 @@ async function handleContentTarget(
         title: appendAlertPostfix(`Content changed on ${page}`),
         details: JSON.stringify({ pageUrl: page, diffPreview: preview, totalAdded, totalRemoved }),
         createdAt: new Date(),
+        summaryDetails: {
+          pageUrl: page,
+          beforeMarkdown: prev.payload,
+          afterMarkdown: curr.md,
+          diffPreview: preview,
+          totalAdded,
+          totalRemoved,
+        },
       });
     }
   } catch (err) {
@@ -286,10 +286,23 @@ export async function runWebsiteChecks(
     .select({
       contextDevApiKey: schema.userNotificationSettings.contextDevApiKey,
       resendApiKey: schema.userNotificationSettings.resendApiKey,
+      aiProvider: schema.userNotificationSettings.aiProvider,
+      openaiApiKey: schema.userNotificationSettings.openaiApiKey,
+      vercelAiGatewayApiKey: schema.userNotificationSettings.vercelAiGatewayApiKey,
+      aiModel: schema.userNotificationSettings.aiModel,
     })
     .from(schema.userNotificationSettings)
     .where(eq(schema.userNotificationSettings.userId, website.userId))
     .limit(1);
+
+  const aiConfig = userSettings
+    ? resolveAiSummaryConfig({
+        aiProvider: userSettings.aiProvider,
+        openaiApiKey: userSettings.openaiApiKey,
+        vercelAiGatewayApiKey: userSettings.vercelAiGatewayApiKey,
+        aiModel: userSettings.aiModel,
+      })
+    : null;
 
   const userDestinations = await db
     .select({
@@ -401,14 +414,42 @@ export async function runWebsiteChecks(
   }
 
   if (alerts.length > 0) {
-    await db.insert(schema.alert).values(alerts);
-
     const targetIdList = [...new Set(alerts.map((a) => a.targetId))];
     const targetRows = await db
       .select()
       .from(schema.target)
       .where(inArray(schema.target.id, targetIdList));
     const targetById = new Map(targetRows.map((t) => [t.id, t]));
+
+    if (aiConfig) {
+      for (const a of alerts) {
+        const tgt = targetById.get(a.targetId);
+        if (!tgt?.aiChangeSummaryEnabled) continue;
+        const summary = await trySummarizeAlert({
+          config: aiConfig,
+          website,
+          alertKind: a.kind,
+          title: a.title,
+          detailsJson: a.details,
+          detailsForSummary: a.summaryDetails,
+        });
+        if (summary) {
+          a.details = mergeAlertDetails(a.details, { aiChangeSummary: summary });
+        }
+      }
+    }
+
+    await db.insert(schema.alert).values(
+      alerts.map((a) => ({
+        id: a.id,
+        websiteId: a.websiteId,
+        targetId: a.targetId,
+        kind: a.kind,
+        title: a.title,
+        details: a.details,
+        createdAt: a.createdAt,
+      })),
+    );
 
     const base = authPublicBaseUrl;
     const siteInfo = { id: website.id, name: website.name, domain: website.domain };
@@ -418,7 +459,12 @@ export async function runWebsiteChecks(
       const tgt = targetById.get(a.targetId);
       if (!tgt) continue;
       const dests = resolveDestinationsForTarget(tgt, userDestinations);
-      let parsedDetails: { diffPreview?: string; totalAdded?: number; totalRemoved?: number } = {};
+      let parsedDetails: {
+        diffPreview?: string;
+        totalAdded?: number;
+        totalRemoved?: number;
+        aiChangeSummary?: string;
+      } = {};
       try {
         parsedDetails = JSON.parse(a.details) as typeof parsedDetails;
       } catch {
@@ -430,6 +476,7 @@ export async function runWebsiteChecks(
         diffPreview: parsedDetails.diffPreview,
         totalAdded: parsedDetails.totalAdded,
         totalRemoved: parsedDetails.totalRemoved,
+        aiChangeSummary: parsedDetails.aiChangeSummary,
       };
       for (const d of dests) {
         const list = alertsByDestinationId.get(d.id) ?? [];

@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useId, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LinkScope, NotificationChannel, Target } from "@/lib/db/schema";
 import type {
@@ -144,6 +145,7 @@ export function TargetRow({
   websiteUrl,
   fetchHistory,
   productPriceHistory,
+  aiSummaryConfigured,
 }: {
   target: Target;
   websiteId: string;
@@ -151,6 +153,8 @@ export function TargetRow({
   websiteUrl: string;
   fetchHistory: TargetFetchEntry[];
   productPriceHistory: ProductPricePoint[];
+  /** Account has AI provider + key + model configured. */
+  aiSummaryConfigured: boolean;
 }) {
   const router = useRouter();
   const detailsId = useId();
@@ -167,6 +171,9 @@ export function TargetRow({
   const [busy, setBusy] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [expandedFetchId, setExpandedFetchId] = useState<string | null>(null);
+  const [aiSummaryEnabled, setAiSummaryEnabled] = useState(
+    target.aiChangeSummaryEnabled ?? false,
+  );
   const showPriceCol = target.kind === "PRODUCT_PRICE";
   const { href: targetHref, label: targetLabel } = targetUrlPresentation(
     websiteUrl,
@@ -186,6 +193,7 @@ export function TargetRow({
     setCheckIntervalHours(target.checkIntervalHours ?? 1);
     setOutboundRouting(deriveOutboundRouting(target));
     setLinkScope(coerceLinkScope(target.linkScope));
+    setAiSummaryEnabled(target.aiChangeSummaryEnabled ?? false);
   }, [target]);
 
   async function toggle() {
@@ -235,6 +243,21 @@ export function TargetRow({
     setBusy(false);
     if (res.ok) {
       setLinkScope(nextScope);
+      router.refresh();
+    }
+  }
+
+  async function setAiSummaryPreference(next: boolean) {
+    if (!aiSummaryConfigured && next) return;
+    setBusy(true);
+    const res = await fetch(`/api/targets/${target.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aiChangeSummaryEnabled: next }),
+    });
+    setBusy(false);
+    if (res.ok) {
+      setAiSummaryEnabled(next);
       router.refresh();
     }
   }
@@ -414,6 +437,46 @@ export function TargetRow({
                 ))}
               </select>
             </label>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-neutral-600">
+              <span
+                className={`group relative inline-flex w-9 shrink-0 rounded-full p-0.5 ring-1 ring-inset transition-colors ${
+                  aiSummaryEnabled
+                    ? "bg-brand-500 ring-brand-500"
+                    : "bg-neutral-200 ring-neutral-950/5"
+                } ${busy || !aiSummaryConfigured ? "opacity-60" : ""}`}
+              >
+                <span
+                  className={`aspect-square w-1/2 rounded-full bg-white shadow-xs ring-1 ring-neutral-950/5 transition-transform ${
+                    aiSummaryEnabled ? "translate-x-full" : ""
+                  }`}
+                />
+                <input
+                  type="checkbox"
+                  className="absolute inset-0 size-full appearance-none focus:outline-none"
+                  checked={aiSummaryEnabled}
+                  disabled={busy || !aiSummaryConfigured}
+                  onChange={() => void setAiSummaryPreference(!aiSummaryEnabled)}
+                  aria-label="AI change summary"
+                />
+              </span>
+              <span className="font-medium text-neutral-800">AI change summary</span>
+            </label>
+            {aiSummaryConfigured ? (
+              <p className="text-xs text-neutral-500">
+                Adds a short plain-language summary to new alerts for this target.
+              </p>
+            ) : (
+              <p className="text-xs text-neutral-500">
+                Configure an AI provider in{" "}
+                <Link href="/dashboard/settings" className="text-brand-700 hover:underline">
+                  Settings
+                </Link>{" "}
+                to enable summaries.
+              </p>
+            )}
           </div>
 
           <div>

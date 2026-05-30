@@ -9,6 +9,8 @@ export type NewAlertsSite = { id: string; name: string; domain: string };
 export type NewAlertsAlert = {
   id: string;
   title: string;
+  /** LLM-generated plain-language summary of the change. */
+  aiChangeSummary?: string;
   /** Raw diff string from diffPreview() — lines prefixed with "+ " or "- ". */
   diffPreview?: string;
   /** True total added lines (may exceed what's stored in diffPreview). */
@@ -73,6 +75,16 @@ function esc(s: string): string {
 /** Text inside Slack `<url|label>` cannot contain `|` (breaks the link grammar). */
 function escSlackLinkLabel(s: string): string {
   return esc(s).replace(/\|/g, " · ");
+}
+
+function formatSummaryForSlack(summary: string | undefined): string {
+  if (!summary?.trim()) return "";
+  return `_Summary: ${esc(trunc(summary.trim(), 400))}_`;
+}
+
+function formatSummaryForPlain(summary: string | undefined): string {
+  if (!summary?.trim()) return "";
+  return `Summary: ${trunc(summary.trim(), 400)}`;
 }
 
 /**
@@ -199,6 +211,8 @@ export function buildNewAlertsSlackBlocks(payload: NewAlertsPayload): SlackBlock
     const url = alertDashboardDeepLink(appBaseUrl, a.id);
 
     let sectionText = `*<${url}|${escSlackLinkLabel(trunc(a.title, 200))}>*`;
+    const summaryLine = formatSummaryForSlack(a.aiChangeSummary);
+    if (summaryLine) sectionText += "\n" + summaryLine;
     if (diffLines.length > 0) sectionText += "\n" + diffLines.join("\n");
 
     blocks.push({ type: "section", text: { type: "mrkdwn", text: sectionText } });
@@ -256,6 +270,8 @@ export function formatNewAlertsSlackText(payload: NewAlertsPayload): string {
       const { lines: diffLines, hasMore, totalChanges } = buildDiffMrkdwnLines(a);
       const deep = alertDashboardDeepLink(appBaseUrl, a.id);
       let text = `• ${trunc(a.title, 200)}\n<${deep}|Open alert & diff>`;
+      const summaryPlain = formatSummaryForPlain(a.aiChangeSummary);
+      if (summaryPlain) text += `\n${summaryPlain}`;
       if (diffLines.length > 0) {
         const shown = diffLines.filter((l) => l.startsWith("~") || l.startsWith("_")).length;
         const suffix = hasMore ? `\n_Showing ${shown} of ${totalChanges} changes in preview — use Open above for full diff._` : "";
@@ -304,10 +320,16 @@ export function formatNewAlertsEmailText(payload: NewAlertsPayload): string {
     .map((a) => {
       const deeplink = alertDashboardDeepLink(appBaseUrl, a.id);
       const { addLines, delLines, totalChanges } = parseDiffLines(a);
-      if (totalChanges === 0) return `• ${trunc(a.title, 200)}\n  Open in app: ${deeplink}`;
+      const summaryPlain = formatSummaryForPlain(a.aiChangeSummary);
+      if (totalChanges === 0) {
+        const parts = [`• ${trunc(a.title, 200)}`, `  Open in app: ${deeplink}`];
+        if (summaryPlain) parts.push(`  ${summaryPlain}`);
+        return parts.join("\n");
+      }
 
       const hasMore = totalChanges > INLINE_CHANGE_LIMIT;
       const parts: string[] = [`• ${trunc(a.title, 200)}`, `  Open in app: ${deeplink}`];
+      if (summaryPlain) parts.push(`  ${summaryPlain}`);
 
       if (!hasMore) {
         const k = Math.min(addLines.length, delLines.length);

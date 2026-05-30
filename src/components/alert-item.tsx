@@ -12,6 +12,7 @@ interface AlertDetails {
   added?: string[];
   removed?: string[];
   pageUrl?: string;
+  aiChangeSummary?: string;
   diffPreview?: string;
   totalAdded?: number;
   totalRemoved?: number;
@@ -162,6 +163,14 @@ function DetailsView({
   const diffAnchor = diffAnchorAlertId ? `alert-diff-${diffAnchorAlertId}` : undefined;
   return (
     <div className="mt-3 space-y-3 text-sm">
+      {details.aiChangeSummary?.trim() && (
+        <div className="rounded-lg bg-brand-50/80 px-3 py-2 ring-1 ring-brand-100">
+          <div className="text-xs font-medium text-brand-900">Summary</div>
+          <p className="mt-1 text-sm leading-relaxed text-neutral-800">
+            {details.aiChangeSummary.trim()}
+          </p>
+        </div>
+      )}
       {details.added && details.added.length > 0 && (
         <LinksBlock title="Added" tone="emerald" urls={details.added} />
       )}

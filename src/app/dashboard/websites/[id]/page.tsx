@@ -16,6 +16,7 @@ import { ExpandableText } from "@/components/expandable-text";
 import { buildProductPriceSeries } from "@/lib/product-price-history";
 import { buildFetchHistoryForTarget } from "@/lib/target-fetch-history";
 import { MarkAllAlertsReadButton } from "@/components/mark-all-alerts-read-button";
+import { resolveAiSummaryConfig } from "@/lib/ai-change-summary";
 export default async function WebsiteDetailPage({
   params,
   searchParams,
@@ -35,7 +36,8 @@ export default async function WebsiteDetailPage({
     .limit(1);
   if (!website) notFound();
 
-  const [targets, alerts, unreadAlertsCountRow, recentSnapshots, notificationDestChoices] = await Promise.all([
+  const [targets, alerts, unreadAlertsCountRow, recentSnapshots, notificationDestChoices, aiSettings] =
+    await Promise.all([
     db.select().from(schema.target).where(eq(schema.target.websiteId, id)).orderBy(desc(schema.target.createdAt)),
     db.select().from(schema.alert).where(eq(schema.alert.websiteId, id)).orderBy(desc(schema.alert.createdAt)).limit(50),
     db
@@ -57,7 +59,27 @@ export default async function WebsiteDetailPage({
       .from(schema.notificationDestination)
       .where(eq(schema.notificationDestination.userId, website.userId))
       .orderBy(asc(schema.notificationDestination.name)),
+    db
+      .select({
+        aiProvider: schema.userNotificationSettings.aiProvider,
+        openaiApiKey: schema.userNotificationSettings.openaiApiKey,
+        vercelAiGatewayApiKey: schema.userNotificationSettings.vercelAiGatewayApiKey,
+        aiModel: schema.userNotificationSettings.aiModel,
+      })
+      .from(schema.userNotificationSettings)
+      .where(eq(schema.userNotificationSettings.userId, website.userId))
+      .limit(1),
   ]);
+
+  const aiSummaryConfigured = Boolean(
+    aiSettings[0] &&
+      resolveAiSummaryConfig({
+        aiProvider: aiSettings[0].aiProvider,
+        openaiApiKey: aiSettings[0].openaiApiKey,
+        vercelAiGatewayApiKey: aiSettings[0].vercelAiGatewayApiKey,
+        aiModel: aiSettings[0].aiModel,
+      }),
+  );
 
   const unreadAlertsCount = unreadAlertsCountRow[0]?.n ?? 0;
 
@@ -177,6 +199,7 @@ export default async function WebsiteDetailPage({
                 websiteUrl={website.url}
                 fetchHistory={buildFetchHistoryForTarget(t, recentSnapshots)}
                 productPriceHistory={buildProductPriceSeries(t, recentSnapshots)}
+                aiSummaryConfigured={aiSummaryConfigured}
               />
             ))}
           </ul>

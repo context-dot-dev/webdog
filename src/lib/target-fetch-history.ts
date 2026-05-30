@@ -1,6 +1,6 @@
 import type { Snapshot, Target } from "./db/schema";
 import { parseProductSnapshotPayload, type ProductSnapshotData } from "./product-price-history";
-import { diffPreview } from "./scraper";
+import { diffPreview } from "./diff-preview";
 
 export type { ProductSnapshotData } from "./product-price-history";
 

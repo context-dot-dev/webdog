@@ -14,6 +14,7 @@ const createSchema = z.discriminatedUnion("category", [
     notificationDestinationId: z.string().optional(),
     externalNotify: z.boolean().optional(),
     checkIntervalHours: z.number().min(0.25).max(8760).optional(),
+    aiChangeSummaryEnabled: z.boolean().optional(),
   }),
   z.object({
     category: z.literal("PAGE_CONTENT"),
@@ -21,6 +22,7 @@ const createSchema = z.discriminatedUnion("category", [
     notificationDestinationId: z.string().optional(),
     externalNotify: z.boolean().optional(),
     checkIntervalHours: z.number().min(0.25).max(8760).optional(),
+    aiChangeSummaryEnabled: z.boolean().optional(),
   }),
   z.object({
     category: z.literal("PRODUCT_PRICE"),
@@ -28,6 +30,7 @@ const createSchema = z.discriminatedUnion("category", [
     notificationDestinationId: z.string().optional(),
     externalNotify: z.boolean().optional(),
     checkIntervalHours: z.number().min(0.25).max(8760).optional(),
+    aiChangeSummaryEnabled: z.boolean().optional(),
   }),
 ]);
 
@@ -90,6 +93,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const checkIntervalHours = parsed.data.checkIntervalHours ?? 24;
+  const aiChangeSummaryEnabled = parsed.data.aiChangeSummaryEnabled ?? false;
 
   const created: (typeof schema.target.$inferSelect)[] = [];
 
@@ -120,6 +124,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       externalNotify: wantOutbound,
       enabled: true,
       checkIntervalHours,
+      aiChangeSummaryEnabled,
       createdAt: new Date(),
     });
     const [row] = await db.select().from(schema.target).where(eq(schema.target.id, targetId)).limit(1);
@@ -151,6 +156,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     externalNotify: wantOutbound,
     enabled: true,
     checkIntervalHours,
+    aiChangeSummaryEnabled,
     createdAt: new Date(),
   });
 

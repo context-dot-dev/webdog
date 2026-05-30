@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { AccountScopePrompt } from "@/components/account-scope-prompt";
-import { ContextDevSettings } from "@/components/context-dev-settings";
+import { SystemServicesSettings } from "@/components/system-services-settings";
 import { NotificationChannelsSettings } from "@/components/notification-channels-settings";
 import { TeamSettings } from "@/components/team-settings";
 import { db } from "@/lib/db";
@@ -12,9 +12,12 @@ import {
 } from "@/lib/effective-account";
 import { requireUser } from "@/lib/session";
 import {
+  isAiModelManagedByEnv,
   isContextDevApiKeyManagedByEnv,
+  isOpenAiApiKeyManagedByEnv,
   isResendApiKeyManagedByEnv,
   isResendSendFromEmailManagedByEnv,
+  isVercelAiGatewayApiKeyManagedByEnv,
 } from "@/lib/server-managed-config";
 import { publicNotificationDestinations } from "@/lib/notification-destination-public";
 
@@ -47,6 +50,10 @@ export default async function SettingsPage() {
     .select({
       contextDevApiKey: schema.userNotificationSettings.contextDevApiKey,
       resendApiKey: schema.userNotificationSettings.resendApiKey,
+      aiProvider: schema.userNotificationSettings.aiProvider,
+      openaiApiKey: schema.userNotificationSettings.openaiApiKey,
+      vercelAiGatewayApiKey: schema.userNotificationSettings.vercelAiGatewayApiKey,
+      aiModel: schema.userNotificationSettings.aiModel,
     })
     .from(schema.userNotificationSettings)
     .where(eq(schema.userNotificationSettings.userId, ownerId))
@@ -80,9 +87,18 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      <ContextDevSettings
+      <SystemServicesSettings
         initialContextDevApiKey={contextDevApiKeyManaged ? null : row?.contextDevApiKey ?? null}
-        apiKeyManaged={contextDevApiKeyManaged}
+        contextDevApiKeyManaged={contextDevApiKeyManaged}
+        initialOpenaiApiKey={isOpenAiApiKeyManagedByEnv() ? null : row?.openaiApiKey ?? null}
+        initialVercelAiGatewayApiKey={
+          isVercelAiGatewayApiKeyManagedByEnv() ? null : row?.vercelAiGatewayApiKey ?? null
+        }
+        initialAiProvider={row?.aiProvider ?? null}
+        initialAiModel={isAiModelManagedByEnv() ? null : row?.aiModel ?? null}
+        openaiApiKeyManaged={isOpenAiApiKeyManagedByEnv()}
+        vercelAiGatewayApiKeyManaged={isVercelAiGatewayApiKeyManagedByEnv()}
+        aiModelManaged={isAiModelManagedByEnv()}
       />
 
       {teamManagement && <TeamSettings />}

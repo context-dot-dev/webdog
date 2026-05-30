@@ -69,3 +69,39 @@ export function appendAlertPostfix(text: string): string {
 export function maxAlertsPerAccount(): number | null {
   return readNonNegativeInteger("MAX_ALERTS");
 }
+
+export function serverOpenAiApiKey(): string | null {
+  return readEnvValue("OPENAI_API_KEY");
+}
+
+export function isOpenAiApiKeyManagedByEnv(): boolean {
+  return serverOpenAiApiKey() !== null;
+}
+
+export function effectiveOpenAiApiKey(accountKey?: string | null): string | null {
+  return serverOpenAiApiKey() ?? accountKey?.trim() ?? null;
+}
+
+export function serverVercelAiGatewayApiKey(): string | null {
+  return readEnvValue("AI_GATEWAY_API_KEY", "VERCEL_AI_GATEWAY_API_KEY");
+}
+
+export function isVercelAiGatewayApiKeyManagedByEnv(): boolean {
+  return serverVercelAiGatewayApiKey() !== null;
+}
+
+export function effectiveVercelAiGatewayApiKey(accountKey?: string | null): string | null {
+  return serverVercelAiGatewayApiKey() ?? accountKey?.trim() ?? null;
+}
+
+export function serverAiModel(): string | null {
+  return readEnvValue("AI_MODEL");
+}
+
+export function isAiModelManagedByEnv(): boolean {
+  return serverAiModel() !== null;
+}
+
+export function effectiveAiModel(accountModel?: string | null): string | null {
+  return serverAiModel() ?? accountModel?.trim() ?? null;
+}

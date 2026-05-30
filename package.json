@@ -24,6 +24,9 @@
     "lint": "eslint src scripts drizzle.config.ts next.config.ts tailwind.config.ts eslint.config.mjs"
   },
   "dependencies": {
+    "@ai-sdk/gateway": "^3.0.121",
+    "@ai-sdk/openai": "^3.0.67",
+    "ai": "^6.0.193",
     "better-auth": "^1.6.11",
     "context.dev": "^1.18.0",
     "dotenv": "^16.4.7",

@@ -78,6 +78,14 @@ export const userNotificationSettings = pgTable("userNotificationSettings", {
   accountBrandLogoUrl: text("accountBrandLogoUrl"),
   /** Per-account Resend API key used only when RESEND_API_KEY is not configured on the server. */
   resendApiKey: text("resendApiKey"),
+  /** openai | vercel_gateway — which LLM endpoint to use for change summaries. */
+  aiProvider: text("aiProvider", { enum: ["openai", "vercel_gateway"] }),
+  /** Per-account OpenAI key when OPENAI_API_KEY is not configured on the server. */
+  openaiApiKey: text("openaiApiKey"),
+  /** Per-account Vercel AI Gateway key when AI_GATEWAY_API_KEY is not configured on the server. */
+  vercelAiGatewayApiKey: text("vercelAiGatewayApiKey"),
+  /** Model id for change summaries (e.g. gpt-4.1-nano or openai/gpt-4.1-nano). */
+  aiModel: text("aiModel"),
   updatedAt: timestamp("updatedAt", { withTimezone: true, precision: 3 })
     .notNull()
     .defaultNow(),
@@ -178,6 +186,8 @@ export const target = pgTable(
       () => notificationDestination.id,
       { onDelete: "set null" },
     ),
+    /** When true, new alerts for this target get an LLM-generated plain-language summary. */
+    aiChangeSummaryEnabled: boolean("aiChangeSummaryEnabled").notNull().default(false),
     createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
       .defaultNow(),
@@ -305,3 +315,4 @@ export type Alert = typeof alert.$inferSelect;
 export type AlertKind = Alert["kind"];
 export type TargetKind = Target["kind"];
 export type LinkScope = NonNullable<Target["linkScope"]>;
+export type AiProvider = NonNullable<UserNotificationSettings["aiProvider"]>;
