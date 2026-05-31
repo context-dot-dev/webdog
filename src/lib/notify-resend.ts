@@ -53,19 +53,23 @@ export async function sendResendEmail(opts: {
   to: string[];
   subject: string;
   text: string;
+  html?: string;
 }): Promise<void> {
+  const body: Record<string, unknown> = {
+    from: opts.from,
+    to: opts.to,
+    subject: opts.subject,
+    text: opts.text,
+  };
+  if (opts.html) body.html = opts.html;
+
   const res = await fetch(RESEND_API_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${opts.apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from: opts.from,
-      to: opts.to,
-      subject: opts.subject,
-      text: opts.text,
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {

@@ -2,6 +2,7 @@
  * Shared structure for "new alerts" notifications across Slack and email.
  */
 
+import { parseDiff } from "./diff-display";
 import { APP_NAME, NEW_ALERTS_EVENT_TYPE } from "./product-info";
 
 export type NewAlertsSite = { id: string; name: string; domain: string };
@@ -63,7 +64,7 @@ export type SlackBlock =
 // Helpers
 // ---------------------------------------------------------------------------
 
-function trunc(s: string, max: number): string {
+export function trunc(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max - 1) + "…";
 }
 
@@ -91,7 +92,7 @@ function formatSummaryForPlain(summary: string | undefined): string {
  * If the total number of changed lines (added + removed) is at or below this
  * threshold, show all of them inline. Otherwise show a preview + "View all" button.
  */
-const INLINE_CHANGE_LIMIT = 3;
+export const INLINE_CHANGE_LIMIT = 3;
 
 /**
  * Parse the raw diff string into separate add/del arrays and compute the true
@@ -105,12 +106,9 @@ function parseDiffLines(alert: NewAlertsAlert): {
   const { diffPreview } = alert;
   if (!diffPreview?.trim()) return { addLines: [], delLines: [], totalChanges: 0 };
 
-  const addLines: string[] = [];
-  const delLines: string[] = [];
-  for (const line of diffPreview.split("\n").filter(Boolean)) {
-    if (line.startsWith("+ ") || line === "+") addLines.push(line.slice(2));
-    else if (line.startsWith("- ") || line === "-") delLines.push(line.slice(2));
-  }
+  const lines = parseDiff(diffPreview).filter((l) => l.kind !== "ctx");
+  const addLines = lines.filter((l) => l.kind === "add").map((l) => l.text);
+  const delLines = lines.filter((l) => l.kind === "del").map((l) => l.text);
 
   const totalAdded = alert.totalAdded ?? addLines.length;
   const totalRemoved = alert.totalRemoved ?? delLines.length;

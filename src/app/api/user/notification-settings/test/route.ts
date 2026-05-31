@@ -10,9 +10,13 @@ import {
   postAlertWebhookJson,
 } from "@/lib/notify-outbound-webhook";
 import { isValidSlackIncomingWebhookUrl, postSlackIncomingWebhook } from "@/lib/notify-slack";
+import { authPublicBaseUrl } from "@/lib/auth";
+import { buildSampleNewAlertsEmailPayload, renderNewAlertsEmail } from "@/lib/new-alerts-email";
 import { parseResendToEmails, sendResendEmail } from "@/lib/notify-resend";
 import { APP_NAME } from "@/lib/product-info";
+import { formatNewAlertsEmailSubject } from "@/lib/notification-new-alerts";
 import {
+  appendAlertPostfix,
   effectiveResendApiKey,
   effectiveResendSendFromEmail,
   isResendApiKeyManagedByEnv,
@@ -24,7 +28,6 @@ const bodySchema = z.object({
 });
 
 const SLACK_TEST_MESSAGE = `${APP_NAME}: Slack test — if you see this, the webhook works.`;
-const EMAIL_TEST_SUBJECT = `${APP_NAME} email test`;
 const EMAIL_TEST_TEXT =
   `This is a test message from ${APP_NAME}.\n\nIf you received this, your Resend integration is working.`;
 
@@ -92,12 +95,15 @@ export async function POST(req: Request) {
   }
 
   try {
+    const samplePayload = buildSampleNewAlertsEmailPayload(authPublicBaseUrl);
+    const { html, text } = renderNewAlertsEmail(samplePayload);
     await sendResendEmail({
       apiKey: key,
       from,
       to,
-      subject: EMAIL_TEST_SUBJECT,
-      text: EMAIL_TEST_TEXT,
+      subject: appendAlertPostfix(`${formatNewAlertsEmailSubject(samplePayload)} (test)`),
+      text: `${EMAIL_TEST_TEXT}\n\n---\n\n${text}`,
+      html,
     });
   } catch {
     return NextResponse.json({ error: "Email delivery failed" }, { status: 502 });

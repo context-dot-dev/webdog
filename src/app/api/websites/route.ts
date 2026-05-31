@@ -14,6 +14,8 @@ import {
   scrapeScreenshot,
 } from "@/lib/context-client";
 import { effectiveContextDevApiKey } from "@/lib/server-managed-config";
+import { monitorLimitError } from "@/lib/account-monitor-limits";
+import { buildInitialPageUrl } from "@/lib/website-url-input";
 
 export async function GET() {
   const { user, response } = await getApiUser();
@@ -43,6 +45,8 @@ export async function GET() {
 
 const createSchema = z.object({
   domain: z.string().trim().min(1).max(253),
+  /** When the user pasted a full page URL, monitor that page for content changes. */
+  initialPagePath: z.string().min(1).max(2048).optional(),
 });
 
 export async function POST(req: Request) {
@@ -107,6 +111,50 @@ export async function POST(req: Request) {
     backdropUrl: assets.backdropUrl,
     createdAt: new Date(),
   });
+
+  const initialPagePath = parsed.data.initialPagePath?.trim();
+  if (initialPagePath && initialPagePath !== "/") {
+    const pageUrl = buildInitialPageUrl(domain, initialPagePath);
+    try {
+      const parsedPage = new URL(pageUrl);
+      const pageDomain = normalizeDomain(parsedPage.hostname);
+      if (pageDomain !== domain) {
+        return badRequest("Page path must be on the same domain as the website");
+      }
+    } catch {
+      return badRequest("Enter a valid page path");
+    }
+
+    const limitError = await monitorLimitError(ownerId);
+    if (!limitError) {
+      const [duplicate] = await db
+        .select({ id: schema.target.id })
+        .from(schema.target)
+        .where(
+          and(
+            eq(schema.target.websiteId, id),
+            eq(schema.target.kind, "PAGE_CONTENT"),
+            eq(schema.target.pageUrl, pageUrl),
+          ),
+        )
+        .limit(1);
+      if (!duplicate) {
+        const targetId = newId("tgt");
+        await db.insert(schema.target).values({
+          id: targetId,
+          websiteId: id,
+          kind: "PAGE_CONTENT",
+          pageUrl,
+          notificationDestinationId: null,
+          externalNotify: false,
+          enabled: true,
+          checkIntervalHours: 24,
+          aiChangeSummaryEnabled: false,
+          createdAt: new Date(),
+        });
+      }
+    }
+  }
 
   const [created] = await db
     .select()

@@ -1,9 +1,9 @@
+import { renderNewAlertsEmail } from "./new-alerts-email";
 import {
   type NewAlertsPayload,
   buildNewAlertsSlackBlocks,
   buildNewAlertsWebhookBody,
   formatNewAlertsEmailSubject,
-  formatNewAlertsEmailText,
   formatNewAlertsSlackText,
 } from "./notification-new-alerts";
 import { isValidAlertWebhookUrl, postAlertWebhookJson } from "./notify-outbound-webhook";
@@ -49,12 +49,14 @@ export async function dispatchNewAlertsForDestinations(
       const to = parseResendToEmails(d.resendToEmails ?? null);
       if (key && from && to.length > 0) {
         try {
+          const { html, text } = renderNewAlertsEmail(payload);
           await sendResendEmail({
             apiKey: key,
             from,
             to,
             subject: appendAlertPostfix(formatNewAlertsEmailSubject(payload)),
-            text: formatNewAlertsEmailText(payload),
+            text,
+            html,
           });
         } catch (err) {
           console.error("[resend] failed to notify:", err);

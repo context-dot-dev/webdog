@@ -3,34 +3,29 @@
 import { useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
-
-/** Strips scheme and path when pasting a URL so the value is hostname-only (`https://` is shown beside the input). */
-function normalizePastedDomainField(raw: string): string {
-  const t = raw.trim();
-  if (!t) return "";
-
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) {
-    try {
-      const u = new URL(t);
-      return u.host || t;
-    } catch {
-      /* fall through */
-    }
-  }
-
-  const noProto = t.replace(/^\/\//, "").replace(/^https?:\/\//i, "");
-  return noProto.split("/")[0].split("?")[0].split("#")[0].trim();
-}
+import { normalizeDomain } from "@/lib/context-client";
+import {
+  buildInitialPageUrl,
+  parseWebsiteUrlInput,
+} from "@/lib/website-url-input";
 
 export function AddWebsiteDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [domain, setDomain] = useState("");
+  const [pagePath, setPagePath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function applyParsedInput(raw: string) {
+    const { domainHost, pagePath: path } = parseWebsiteUrlInput(raw);
+    setDomain(domainHost);
+    setPagePath(domainHost ? path : null);
+  }
+
   function reset() {
     setDomain("");
+    setPagePath(null);
     setError(null);
     setLoading(false);
   }
@@ -38,16 +33,26 @@ export function AddWebsiteDialog() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const normalized = normalizeDomain(domain);
+    if (!normalized) {
+      setError("Enter a valid domain like example.com");
+      return;
+    }
+
     setLoading(true);
+    const body: { domain: string; initialPagePath?: string } = { domain: normalized };
+    if (pagePath) body.initialPagePath = pagePath;
+
     const res = await fetch("/api/websites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ domain }),
+      body: JSON.stringify(body),
     });
     setLoading(false);
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Something went wrong");
+      const bodyJson = await res.json().catch(() => ({}));
+      setError(bodyJson.error ?? "Something went wrong");
       return;
     }
     const { website } = await res.json();
@@ -56,6 +61,19 @@ export function AddWebsiteDialog() {
     router.push(`/dashboard/websites/${website.id}`);
     router.refresh();
   }
+
+  const pagePreview =
+    pagePath && domain.trim()
+      ? (() => {
+          try {
+            const norm = normalizeDomain(domain);
+            if (!norm) return null;
+            return buildInitialPageUrl(norm, pagePath);
+          } catch {
+            return null;
+          }
+        })()
+      : null;
 
   return (
     <>
@@ -84,7 +102,7 @@ export function AddWebsiteDialog() {
               </p>
               <div className="mt-6">
                 <label htmlFor="w-domain" className="block text-sm font-medium text-neutral-900">
-                  Domain
+                  Domain or page URL
                 </label>
                 <div className="relative mt-1.5">
                   <span
@@ -103,27 +121,34 @@ export function AddWebsiteDialog() {
                     spellCheck={false}
                     required
                     value={domain}
-                    onChange={(e) => setDomain(e.target.value)}
+                    onChange={(e) => applyParsedInput(e.target.value)}
                     onPaste={(e) => {
                       const raw = e.clipboardData.getData("text/plain");
-                      const norm = normalizePastedDomainField(raw);
-                      if (norm === raw.trim()) return;
+                      const parsed = parseWebsiteUrlInput(raw);
+                      if (parsed.domainHost === raw.trim() && !parsed.pagePath) return;
                       e.preventDefault();
                       const el = e.currentTarget;
                       const start = el.selectionStart ?? 0;
                       const end = el.selectionEnd ?? start;
-                      const next = `${domain.slice(0, start)}${norm}${domain.slice(end)}`;
-                      flushSync(() => setDomain(next));
+                      const merged = `${domain.slice(0, start)}${raw}${domain.slice(end)}`;
+                      applyParsedInput(merged);
                       requestAnimationFrame(() => {
-                        const pos = start + norm.length;
+                        const pos = parsed.domainHost.length;
                         el.setSelectionRange(pos, pos);
                       });
                     }}
                   />
                 </div>
                 <p className="mt-2 text-xs text-neutral-500">
-                  Just the domain — no protocol or path. We&apos;ll use the sitemap to track changes.
+                  Paste a domain or a full page link. Domains use the sitemap for link changes; page links also get a
+                  content monitor for that URL.
                 </p>
+                {pagePreview && (
+                  <p className="mt-2 text-xs text-neutral-700">
+                    We&apos;ll also watch{" "}
+                    <span className="font-mono text-neutral-900">{pagePreview}</span> for content changes.
+                  </p>
+                )}
               </div>
               {error && (
                 <p className="mt-4 text-sm text-brand-700" role="alert">
