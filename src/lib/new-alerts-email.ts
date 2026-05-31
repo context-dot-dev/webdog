@@ -16,6 +16,7 @@ import {
   alertDashboardDeepLink,
   formatNewAlertsEmailText,
   INLINE_CHANGE_LIMIT,
+  targetEditDeepLink,
   trunc,
   type NewAlertsAlert,
   type NewAlertsPayload,
@@ -38,6 +39,30 @@ const ADD_HIGHLIGHT = "background:#a7f3d0;color:#065f46;border-radius:2px;paddin
 const CTX_ROW_BG = "#ffffff";
 const CTX_GUTTER_BG = "#f5f5f5";
 const CTX_TEXT = "color:#525252;";
+
+const SUMMARY_BG = "#fff4ee";
+const SUMMARY_BORDER = "#ffc8aa";
+const SUMMARY_LABEL = "#7f2511";
+const SUMMARY_TEXT = "#431407";
+
+/** Normalized AI summary text for an alert, if present. */
+export function getAlertAiSummary(alert: NewAlertsAlert): string | null {
+  const s = alert.aiChangeSummary?.trim();
+  return s ? trunc(s, 400) : null;
+}
+
+function aiSummaryBlockHtml(summary: string): string {
+  return `<div style="margin-top:12px;padding:12px 14px;background:${SUMMARY_BG};border:1px solid ${SUMMARY_BORDER};border-radius:8px;">
+  <p style="margin:0 0 6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:${SUMMARY_LABEL};">AI summary</p>
+  <p style="margin:0;font-size:14px;line-height:1.55;color:${SUMMARY_TEXT};white-space:pre-wrap;">${escapeHtml(summary)}</p>
+</div>`;
+}
+
+function emailPreheaderHtml(alerts: NewAlertsAlert[]): string {
+  const first = alerts.map(getAlertAiSummary).find(Boolean);
+  if (!first) return "";
+  return `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml(first)}</div>`;
+}
 
 function totalChangesForAlert(alert: NewAlertsAlert): number {
   const lines = alert.diffPreview?.trim() ? parseDiff(alert.diffPreview) : [];
@@ -149,19 +174,12 @@ function diffBlockHtml(alert: NewAlertsAlert, dashboardUrl: string): string {
 function alertCardHtml(alert: NewAlertsAlert, appBaseUrl: string): string {
   const url = alertDashboardDeepLink(appBaseUrl, alert.id);
   const title = escapeHtml(trunc(alert.title, 200));
-  const summary = alert.aiChangeSummary?.trim();
-
-  const summaryBlock = summary
-    ? `<div style="margin-top:10px;padding:10px 12px;background:#fff7ed;border-left:3px solid ${BRAND};border-radius:0 6px 6px 0;">
-  <p style="margin:0 0 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#9a3412;">Summary</p>
-  <p style="margin:0;font-size:14px;line-height:1.5;color:#431407;">${escapeHtml(trunc(summary, 400))}</p>
-</div>`
-    : "";
-
+  const summary = getAlertAiSummary(alert);
+  const summaryBlock = summary ? aiSummaryBlockHtml(summary) : "";
   const diffBlock = diffBlockHtml(alert, url);
 
   return `<div style="margin:20px 0;padding:16px;background:#ffffff;border:1px solid #e5e5e5;border-radius:8px;">
-  <h3 style="margin:0 0 4px;font-size:15px;font-weight:600;line-height:1.4;">
+  <h3 style="margin:0;font-size:15px;font-weight:600;line-height:1.4;">
     <a href="${escapeHtml(url)}" style="color:#171717;text-decoration:none;">${title}</a>
   </h3>
   ${summaryBlock}
@@ -169,7 +187,7 @@ function alertCardHtml(alert: NewAlertsAlert, appBaseUrl: string): string {
 </div>`;
 }
 
-function wrapEmailDocument(inner: string): string {
+function wrapEmailDocument(inner: string, alerts: NewAlertsAlert[]): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -178,6 +196,7 @@ function wrapEmailDocument(inner: string): string {
 <title>${escapeHtml(APP_NAME)}</title>
 </head>
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  ${emailPreheaderHtml(alerts)}
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f5f5f5;">
     <tr>
       <td align="center" style="padding:24px 16px;">
@@ -233,11 +252,27 @@ export function formatNewAlertsEmailHtml(payload: NewAlertsPayload): string {
 </tr>
 <tr>
   <td style="padding:16px 20px;background:#fafafa;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 8px 8px;text-align:center;">
-    <p style="margin:0;font-size:12px;color:#a3a3a3;">You received this because a monitored page changed.</p>
+    ${emailFooterHtml(payload)}
   </td>
 </tr>`;
 
-  return wrapEmailDocument(inner);
+  return wrapEmailDocument(inner, alerts);
+}
+
+function emailFooterHtml(payload: NewAlertsPayload): string {
+  const first = payload.alerts[0];
+  const editLink =
+    first?.targetId && payload.site.id
+      ? targetEditDeepLink(payload.appBaseUrl, payload.site.id, first.targetId)
+      : null;
+
+  const editLine = editLink
+    ? `<p style="margin:8px 0 0;font-size:12px;">
+  <a href="${escapeHtml(editLink)}" style="color:#525252;text-decoration:underline;">Edit this target</a>
+</p>`
+    : "";
+
+  return `<p style="margin:0;font-size:12px;color:#a3a3a3;">You received this because a monitored page changed.</p>${editLine}`;
 }
 
 export function renderNewAlertsEmail(payload: NewAlertsPayload): { html: string; text: string } {
@@ -256,6 +291,7 @@ export function buildSampleNewAlertsEmailPayload(appBaseUrl: string): NewAlertsP
     alerts: [
       {
         id: "sample-alert",
+        targetId: "sample-target",
         title: "Pricing page — /pricing",
         aiChangeSummary:
           "The Pro plan price increased from $29 to $39 per month, and annual billing is now highlighted as the default option.",

@@ -22,12 +22,14 @@ export default async function WebsiteDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ alert?: string; diff?: string }>;
+  searchParams: Promise<{ alert?: string; diff?: string; target?: string; edit?: string }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
-  const { alert: highlightedAlertId, diff: diffParam } = await searchParams;
+  const { alert: highlightedAlertId, diff: diffParam, target: highlightedTargetId, edit: editParam } =
+    await searchParams;
   const wantDiffScroll = diffParam === "1" || diffParam === "true";
+  const wantTargetEdit = editParam === "1" || editParam === "true";
 
   const [website] = await db
     .select()
@@ -200,6 +202,7 @@ export default async function WebsiteDetailPage({
                 fetchHistory={buildFetchHistoryForTarget(t, recentSnapshots)}
                 productPriceHistory={buildProductPriceSeries(t, recentSnapshots)}
                 aiSummaryConfigured={aiSummaryConfigured}
+                highlightEdit={wantTargetEdit && t.id === highlightedTargetId}
               />
             ))}
           </ul>

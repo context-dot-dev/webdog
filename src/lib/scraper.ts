@@ -424,7 +424,10 @@ export async function runWebsiteChecks(
     if (aiConfig) {
       for (const a of alerts) {
         const tgt = targetById.get(a.targetId);
-        if (!tgt?.aiChangeSummaryEnabled) continue;
+        if (!tgt) continue;
+        const dests = resolveDestinationsForTarget(tgt, userDestinations);
+        const hasEmailDest = dests.some((d) => d.channel === "EMAIL");
+        if (!tgt.aiChangeSummaryEnabled && !hasEmailDest) continue;
         const summary = await trySummarizeAlert({
           config: aiConfig,
           website,
@@ -472,6 +475,7 @@ export async function runWebsiteChecks(
       }
       const alertEntry: NewAlertsAlert = {
         id: a.id,
+        targetId: a.targetId,
         title: a.title,
         diffPreview: parsedDetails.diffPreview,
         totalAdded: parsedDetails.totalAdded,

@@ -84,7 +84,7 @@ export const userNotificationSettings = pgTable("userNotificationSettings", {
   openaiApiKey: text("openaiApiKey"),
   /** Per-account Vercel AI Gateway key when AI_GATEWAY_API_KEY is not configured on the server. */
   vercelAiGatewayApiKey: text("vercelAiGatewayApiKey"),
-  /** Model id for change summaries (e.g. gpt-4.1-nano or openai/gpt-4.1-nano). */
+  /** Model id for change summaries (e.g. gpt-5.4-nano or openai/gpt-5.4-nano). */
   aiModel: text("aiModel"),
   updatedAt: timestamp("updatedAt", { withTimezone: true, precision: 3 })
     .notNull()

@@ -8,6 +8,10 @@ import { generateText } from "ai";
 import type { AiProvider, AlertKind, Website } from "./db/schema";
 import { diffPreview } from "./diff-preview";
 import {
+  resolveAiModelForProvider,
+  resolveEffectiveAiProvider,
+} from "./ai-models";
+import {
   effectiveAiModel,
   effectiveOpenAiApiKey,
   effectiveVercelAiGatewayApiKey,
@@ -50,11 +54,16 @@ export function resolveAiSummaryConfig(settings: {
   vercelAiGatewayApiKey: string | null;
   aiModel: string | null;
 }): AiSummaryConfig | null {
-  const provider = settings.aiProvider;
+  const openaiConfigured = Boolean(effectiveOpenAiApiKey(settings.openaiApiKey));
+  const vercelConfigured = Boolean(effectiveVercelAiGatewayApiKey(settings.vercelAiGatewayApiKey));
+  const provider = resolveEffectiveAiProvider({
+    aiProvider: settings.aiProvider,
+    openaiConfigured,
+    vercelConfigured,
+  });
   if (!provider) return null;
 
-  const model = effectiveAiModel(settings.aiModel);
-  if (!model) return null;
+  const model = resolveAiModelForProvider(provider, effectiveAiModel(settings.aiModel));
 
   if (provider === "openai") {
     const apiKey = effectiveOpenAiApiKey(settings.openaiApiKey);

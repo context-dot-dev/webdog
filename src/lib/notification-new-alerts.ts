@@ -9,6 +9,7 @@ export type NewAlertsSite = { id: string; name: string; domain: string };
 
 export type NewAlertsAlert = {
   id: string;
+  targetId: string;
   title: string;
   /** LLM-generated plain-language summary of the change. */
   aiChangeSummary?: string;
@@ -153,6 +154,18 @@ export function alertDashboardDeepLink(appBaseUrl: string, alertId: string): str
   const u = new URL("/dashboard/alerts", appBaseUrl);
   u.searchParams.set("alert", alertId);
   u.searchParams.set("diff", "1");
+  return u.toString();
+}
+
+/** Deep-link to a website's target row with settings expanded. */
+export function targetEditDeepLink(
+  appBaseUrl: string,
+  websiteId: string,
+  targetId: string,
+): string {
+  const u = new URL(`/dashboard/websites/${websiteId}`, appBaseUrl);
+  u.searchParams.set("target", targetId);
+  u.searchParams.set("edit", "1");
   return u.toString();
 }
 
@@ -358,6 +371,10 @@ export function buildNewAlertsSlackText(
   site: NewAlertsSite,
   alertTitles: string[],
 ): string {
-  const alerts = alertTitles.map((title, i) => ({ id: `legacy-${i}`, title }));
+  const alerts = alertTitles.map((title, i) => ({
+    id: `legacy-${i}`,
+    targetId: `legacy-target-${i}`,
+    title,
+  }));
   return formatNewAlertsSlackText(buildNewAlertsPayload(appBaseUrl, site, alerts));
 }

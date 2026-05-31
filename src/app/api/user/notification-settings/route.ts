@@ -8,6 +8,11 @@ import { badRequest, getApiUser, parseJson, requireApiUserWithWriteOwner } from 
 import { accountOwnerColumnAccessible } from "@/lib/account-access";
 import { getEffectiveAccountOwnerForWrites } from "@/lib/effective-account";
 import { ContextDevError, resolveAccountBrandLogoUrl } from "@/lib/context-client";
+import { resolveAiSummaryConfig } from "@/lib/ai-change-summary";
+import {
+  resolveAiModelForProvider,
+  resolveEffectiveAiProvider,
+} from "@/lib/ai-models";
 import {
   effectiveOpenAiApiKey,
   effectiveVercelAiGatewayApiKey,
@@ -84,11 +89,13 @@ function aiSettingsResponse(row: SettingsRow | null) {
     vercelAiGatewayApiKeyManaged,
     aiModelManaged,
     aiConfigured: Boolean(
-      row?.aiProvider &&
-        row.aiModel &&
-        ((row.aiProvider === "openai" && effectiveOpenAiApiKey(row.openaiApiKey)) ||
-          (row.aiProvider === "vercel_gateway" &&
-            effectiveVercelAiGatewayApiKey(row.vercelAiGatewayApiKey))),
+      row &&
+        resolveAiSummaryConfig({
+          aiProvider: row.aiProvider,
+          openaiApiKey: row.openaiApiKey,
+          vercelAiGatewayApiKey: row.vercelAiGatewayApiKey,
+          aiModel: row.aiModel,
+        }),
     ),
   };
 }
@@ -217,14 +224,28 @@ export async function PATCH(req: Request) {
   if (gatewayKeyIn !== undefined) gatewayKey = normalizeSecretKey(gatewayKeyIn);
   if (aiModelIn !== undefined) aiModel = normalizeAiModel(aiModelIn);
 
-  if (aiProvider) {
-    if (!aiModel && !aiModelManaged) {
-      return badRequest("Select a model for AI change summaries");
+  const openaiConfigured = Boolean(effectiveOpenAiApiKey(openaiKey));
+  const vercelConfigured = Boolean(effectiveVercelAiGatewayApiKey(gatewayKey));
+  const resolvedProvider = resolveEffectiveAiProvider({
+    aiProvider,
+    openaiConfigured,
+    vercelConfigured,
+  });
+  if (resolvedProvider) {
+    aiProvider = resolvedProvider;
+    if (!aiModelManaged) {
+      aiModel = resolveAiModelForProvider(resolvedProvider, aiModel);
     }
-    if (aiProvider === "openai" && !effectiveOpenAiApiKey(openaiKey)) {
+  } else {
+    aiProvider = null;
+    if (!aiModelManaged) aiModel = null;
+  }
+
+  if (aiProvider) {
+    if (aiProvider === "openai" && !openaiConfigured) {
       return badRequest("OpenAI API key is required for the OpenAI provider");
     }
-    if (aiProvider === "vercel_gateway" && !effectiveVercelAiGatewayApiKey(gatewayKey)) {
+    if (aiProvider === "vercel_gateway" && !vercelConfigured) {
       return badRequest("Vercel AI Gateway API key is required for the AI Gateway provider");
     }
   }

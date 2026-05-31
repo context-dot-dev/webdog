@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useId, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LinkScope, NotificationChannel, Target } from "@/lib/db/schema";
@@ -146,6 +146,7 @@ export function TargetRow({
   fetchHistory,
   productPriceHistory,
   aiSummaryConfigured,
+  highlightEdit,
 }: {
   target: Target;
   websiteId: string;
@@ -155,9 +156,12 @@ export function TargetRow({
   productPriceHistory: ProductPricePoint[];
   /** Account has AI provider + key + model configured. */
   aiSummaryConfigured: boolean;
+  /** Deep-link hint (`?target=…&edit=1`): expand settings and scroll into view. */
+  highlightEdit?: boolean;
 }) {
   const router = useRouter();
   const detailsId = useId();
+  const rowRef = useRef<HTMLLIElement>(null);
   const [enabled, setEnabled] = useState(target.enabled);
   const [checkIntervalHours, setCheckIntervalHours] = useState(
     target.checkIntervalHours ?? 1,
@@ -169,7 +173,7 @@ export function TargetRow({
     coerceLinkScope(target.linkScope),
   );
   const [busy, setBusy] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(highlightEdit ?? false);
   const [expandedFetchId, setExpandedFetchId] = useState<string | null>(null);
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(
     target.aiChangeSummaryEnabled ?? false,
@@ -195,6 +199,15 @@ export function TargetRow({
     setLinkScope(coerceLinkScope(target.linkScope));
     setAiSummaryEnabled(target.aiChangeSummaryEnabled ?? false);
   }, [target]);
+
+  useEffect(() => {
+    if (!highlightEdit) return;
+    setDetailsOpen(true);
+    const id = window.setTimeout(() => {
+      rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+    return () => clearTimeout(id);
+  }, [highlightEdit]);
 
   async function toggle() {
     setBusy(true);
@@ -281,7 +294,11 @@ export function TargetRow({
   }
 
   return (
-    <li className="flex flex-col">
+    <li
+      ref={rowRef}
+      id={`target-${target.id}`}
+      className={`flex flex-col ${highlightEdit ? "ring-1 ring-inset ring-brand-500/30" : ""}`}
+    >
       <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
           <KindBadge kind={target.kind} />
@@ -351,14 +368,28 @@ export function TargetRow({
           id={detailsId}
           className="space-y-5 border-t border-neutral-950/5 bg-neutral-50/50 px-5 py-4"
         >
-          {target.pageUrl && (
-            <p className="text-xs text-neutral-600">
-              <span className="font-medium text-neutral-800">Watched page</span>{" "}
-              <span className="font-mono text-neutral-600">
-                {target.pageUrl}
-              </span>
-            </p>
-          )}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            {target.pageUrl ? (
+              <p className="min-w-0 flex-1 text-xs text-neutral-600">
+                <span className="font-medium text-neutral-800">Watched page</span>{" "}
+                <span className="break-all font-mono text-neutral-600">
+                  {target.pageUrl}
+                </span>
+              </p>
+            ) : null}
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={remove}
+                disabled={busy}
+                className="btn-ghost px-2 py-1.5 text-xs text-rose-700 hover:text-rose-800"
+                aria-label="Delete target"
+              >
+                Delete target
+              </button>
+              <RunNowButton websiteId={websiteId} targetId={target.id} />
+            </div>
+          </div>
           {target.kind === "SITEMAP_LINKS" && (
             <>
               <p className="text-xs text-neutral-600">
@@ -599,18 +630,6 @@ export function TargetRow({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-start gap-3 pt-1">
-            <button
-              type="button"
-              onClick={remove}
-              disabled={busy}
-              className="btn-ghost px-2 py-1.5 text-xs text-rose-700 hover:text-rose-800"
-              aria-label="Delete target"
-            >
-              Delete target
-            </button>
-            <RunNowButton websiteId={websiteId} targetId={target.id} />
-          </div>
         </div>
       )}
     </li>

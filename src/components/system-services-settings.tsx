@@ -6,7 +6,12 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AiModelSearchSelect } from "@/components/ai-model-search-select";
 import type { AiProvider } from "@/lib/db/schema";
-import { AI_MODELS_BY_PROVIDER, defaultAiModelForProvider } from "@/lib/ai-models";
+import {
+  AI_MODELS_BY_PROVIDER,
+  defaultAiModelForProvider,
+  resolveAiModelForProvider,
+  resolveEffectiveAiProvider,
+} from "@/lib/ai-models";
 
 type ServiceId = "context_dev" | "openai" | "vercel_gateway";
 
@@ -149,7 +154,15 @@ export function SystemServicesSettings({
   const [contextKey, setContextKey] = useState(() => initialContextDevApiKey ?? "");
   const [openaiKey, setOpenaiKey] = useState(() => initialOpenaiApiKey ?? "");
   const [gatewayKey, setGatewayKey] = useState(() => initialVercelAiGatewayApiKey ?? "");
-  const [aiProvider, setAiProvider] = useState<AiProvider | null>(() => initialAiProvider ?? null);
+  const [aiProvider, setAiProvider] = useState<AiProvider | null>(() =>
+    resolveEffectiveAiProvider({
+      aiProvider: initialAiProvider ?? null,
+      openaiConfigured:
+        openaiApiKeyManaged || (initialOpenaiApiKey?.trim() ?? "") !== "",
+      vercelConfigured:
+        vercelAiGatewayApiKeyManaged || (initialVercelAiGatewayApiKey?.trim() ?? "") !== "",
+    }),
+  );
   const [aiModel, setAiModel] = useState(() => initialAiModel ?? "");
 
   const [editingService, setEditingService] = useState<ServiceId | null>(null);
@@ -224,18 +237,26 @@ export function SystemServicesSettings({
     const body: Record<string, unknown> = { openaiApiKey: key };
     if (key) {
       const nextProvider: AiProvider = "openai";
-      if (!aiProvider || aiProvider === "openai") {
+      if (!aiProvider || aiProvider === "openai" || !vercelConfigured) {
         body.aiProvider = nextProvider;
         if (!aiModelManaged) {
-          body.aiModel =
-            aiModel.trim() ||
-            initialAiModel ||
-            defaultAiModelForProvider(nextProvider);
+          body.aiModel = resolveAiModelForProvider(
+            nextProvider,
+            aiModel.trim() || initialAiModel,
+          );
         }
       }
     } else if (aiProvider === "openai") {
-      body.aiProvider = null;
-      body.aiModel = null;
+      if (vercelConfigured) {
+        const nextProvider: AiProvider = "vercel_gateway";
+        body.aiProvider = nextProvider;
+        if (!aiModelManaged) {
+          body.aiModel = resolveAiModelForProvider(nextProvider, aiModel.trim() || initialAiModel);
+        }
+      } else {
+        body.aiProvider = null;
+        body.aiModel = null;
+      }
     }
     await patchSettings(body);
   }
@@ -245,18 +266,26 @@ export function SystemServicesSettings({
     const body: Record<string, unknown> = { vercelAiGatewayApiKey: key };
     if (key) {
       const nextProvider: AiProvider = "vercel_gateway";
-      if (!aiProvider || aiProvider === "vercel_gateway") {
+      if (!aiProvider || aiProvider === "vercel_gateway" || !openaiConfigured) {
         body.aiProvider = nextProvider;
         if (!aiModelManaged) {
-          body.aiModel =
-            aiModel.trim() ||
-            initialAiModel ||
-            defaultAiModelForProvider(nextProvider);
+          body.aiModel = resolveAiModelForProvider(
+            nextProvider,
+            aiModel.trim() || initialAiModel,
+          );
         }
       }
     } else if (aiProvider === "vercel_gateway") {
-      body.aiProvider = null;
-      body.aiModel = null;
+      if (openaiConfigured) {
+        const nextProvider: AiProvider = "openai";
+        body.aiProvider = nextProvider;
+        if (!aiModelManaged) {
+          body.aiModel = resolveAiModelForProvider(nextProvider, aiModel.trim() || initialAiModel);
+        }
+      } else {
+        body.aiProvider = null;
+        body.aiModel = null;
+      }
     }
     await patchSettings(body);
   }
@@ -270,8 +299,16 @@ export function SystemServicesSettings({
     setOpenaiKey("");
     const body: Record<string, unknown> = { openaiApiKey: null };
     if (aiProvider === "openai") {
-      body.aiProvider = null;
-      body.aiModel = null;
+      if (vercelConfigured) {
+        const nextProvider: AiProvider = "vercel_gateway";
+        body.aiProvider = nextProvider;
+        if (!aiModelManaged) {
+          body.aiModel = resolveAiModelForProvider(nextProvider, aiModel.trim() || initialAiModel);
+        }
+      } else {
+        body.aiProvider = null;
+        body.aiModel = null;
+      }
     }
     await patchSettings(body);
   }
@@ -280,8 +317,16 @@ export function SystemServicesSettings({
     setGatewayKey("");
     const body: Record<string, unknown> = { vercelAiGatewayApiKey: null };
     if (aiProvider === "vercel_gateway") {
-      body.aiProvider = null;
-      body.aiModel = null;
+      if (openaiConfigured) {
+        const nextProvider: AiProvider = "openai";
+        body.aiProvider = nextProvider;
+        if (!aiModelManaged) {
+          body.aiModel = resolveAiModelForProvider(nextProvider, aiModel.trim() || initialAiModel);
+        }
+      } else {
+        body.aiProvider = null;
+        body.aiModel = null;
+      }
     }
     await patchSettings(body);
   }
@@ -405,7 +450,7 @@ export function SystemServicesSettings({
             value={aiModel}
             onChange={setAiModel}
             draftApiKey={gatewayKey}
-            hint="Search by model name or id (e.g. openai/gpt-4.1-nano)."
+            hint="Search by model name or id (e.g. openai/gpt-5.4-nano)."
           />
         ) : null}
         {formActions(saveVercelGateway)}
