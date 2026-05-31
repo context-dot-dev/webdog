@@ -10,11 +10,7 @@ import { isValidAlertWebhookUrl, postAlertWebhookJson } from "./notify-outbound-
 import { isValidSlackIncomingWebhookUrl, postSlackIncomingWebhook } from "./notify-slack";
 import { parseResendToEmails, sendResendEmail } from "./notify-resend";
 import type { NotificationChannel } from "./db/schema";
-import {
-  appendAlertPostfix,
-  effectiveResendApiKey,
-  effectiveResendSendFromEmail,
-} from "./server-managed-config";
+import { effectiveResendApiKey, effectiveResendSendFromEmail } from "./server-managed-config";
 
 export type DestinationDispatchRow = {
   channel: NotificationChannel;
@@ -54,7 +50,7 @@ export async function dispatchNewAlertsForDestinations(
             apiKey: key,
             from,
             to,
-            subject: appendAlertPostfix(formatNewAlertsEmailSubject(payload)),
+            subject: formatNewAlertsEmailSubject(payload),
             text,
             html,
           });

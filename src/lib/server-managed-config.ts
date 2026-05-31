@@ -1,3 +1,5 @@
+import { stripAlertPostfixText } from "./alert-postfix";
+
 if (typeof window !== "undefined") {
   throw new Error("server-managed config must not be imported in the browser");
 }
@@ -64,6 +66,11 @@ export function appendAlertPostfix(text: string): string {
   const trimmedText = text.trimEnd();
   if (trimmedText.endsWith(postfix)) return trimmedText;
   return `${trimmedText} ${postfix}`;
+}
+
+/** Remove deployment postfix from stored alert titles (legacy rows). */
+export function stripAlertPostfix(text: string): string {
+  return stripAlertPostfixText(text, alertPostfix());
 }
 
 export function maxAlertsPerAccount(): number | null {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Alert } from "@/lib/db/schema";
 import { KindBadge } from "./target-kind";
@@ -31,15 +31,13 @@ interface AlertDetails {
   newCurrency?: string | null;
 }
 
-function alertTitleForDisplay(title: string): string {
-  return title.replace(/https?:\/\//g, "");
-}
-
 export function AlertItem({
   alert,
   highlighted,
   scrollToDiff,
   website,
+  titleLabel,
+  attribution,
 }: {
   alert: Alert;
   highlighted?: boolean;
@@ -47,6 +45,10 @@ export function AlertItem({
   scrollToDiff?: boolean;
   /** When set (e.g. global alerts page), include site in the one-line summary row. */
   website?: { id: string; name: string; domain: string };
+  /** Stripped alert title for display (from server `alertTitleForDisplay`). */
+  titleLabel?: string;
+  /** Optional deployment attribution shown in the expanded footer. */
+  attribution?: string | null;
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(highlighted ?? false);
@@ -135,7 +137,9 @@ export function AlertItem({
           </Link>
         )}
         <KindBadge kind={alert.kind} compact />
-        <p className="min-w-0 flex-1 truncate text-sm text-neutral-900">{alertTitleForDisplay(alert.title)}</p>
+        <p className="min-w-0 flex-1 truncate text-sm text-neutral-900">
+          {titleLabel ?? alert.title.replace(/https?:\/\//g, "")}
+        </p>
         <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-neutral-500">
           <RelativeTime date={parseTimestamp(alert.createdAt)} />
         </span>
@@ -154,7 +158,7 @@ export function AlertItem({
       </div>
       {expanded && (
         <div className={`border-t border-neutral-950/[0.05] pb-4 pt-3 ${rowPx}`}>
-          <DetailsView details={details} diffAnchorAlertId={alert.id} />
+          <DetailsView details={details} diffAnchorAlertId={alert.id} attribution={attribution} />
         </div>
       )}
     </li>
@@ -164,9 +168,11 @@ export function AlertItem({
 function DetailsView({
   details,
   diffAnchorAlertId,
+  attribution,
 }: {
   details: AlertDetails;
   diffAnchorAlertId?: string;
+  attribution?: string | null;
 }) {
   const diffAnchor = diffAnchorAlertId ? `alert-diff-${diffAnchorAlertId}` : undefined;
   return (
@@ -216,7 +222,36 @@ function DetailsView({
           />
         </div>
       )}
+      {attribution?.trim() && (
+        <p className="border-t border-neutral-950/5 pt-3 text-xs leading-relaxed text-neutral-400">
+          <AttributionText text={attribution.trim()} />
+        </p>
+      )}
     </div>
+  );
+}
+
+function AttributionText({ text }: { text: string }) {
+  const parts = text.split("Context.dev");
+  if (parts.length === 1) return <>{text}</>;
+  return (
+    <>
+      {parts.map((part, i) => (
+        <Fragment key={i}>
+          {part}
+          {i < parts.length - 1 && (
+            <a
+              href="https://context.dev"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-neutral-500 underline-offset-2 hover:text-brand-700 hover:underline"
+            >
+              Context.dev
+            </a>
+          )}
+        </Fragment>
+      ))}
+    </>
   );
 }
 

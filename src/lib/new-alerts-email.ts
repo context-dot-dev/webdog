@@ -21,7 +21,9 @@ import {
   type NewAlertsAlert,
   type NewAlertsPayload,
 } from "./notification-new-alerts";
+import { formatAttributionHtml, formatAttributionPlain } from "./alert-postfix";
 import { APP_NAME } from "./product-info";
+import { alertPostfix, stripAlertPostfix } from "./server-managed-config";
 
 const MAX_ALERTS = 5;
 const BRAND = "#ff5a1f";
@@ -173,7 +175,7 @@ function diffBlockHtml(alert: NewAlertsAlert, dashboardUrl: string): string {
 
 function alertCardHtml(alert: NewAlertsAlert, appBaseUrl: string): string {
   const url = alertDashboardDeepLink(appBaseUrl, alert.id);
-  const title = escapeHtml(trunc(alert.title, 200));
+  const title = escapeHtml(trunc(stripAlertPostfix(alert.title), 200));
   const summary = getAlertAiSummary(alert);
   const summaryBlock = summary ? aiSummaryBlockHtml(summary) : "";
   const diffBlock = diffBlockHtml(alert, url);
@@ -259,6 +261,25 @@ export function formatNewAlertsEmailHtml(payload: NewAlertsPayload): string {
   return wrapEmailDocument(inner, alerts);
 }
 
+function postfixFooterHtml(): string {
+  const postfix = alertPostfix();
+  if (!postfix) return "";
+  return `<p style="margin:12px 0 0;font-size:12px;line-height:1.5;color:#a3a3a3;">${formatAttributionHtml(postfix, escapeHtml)}</p>`;
+}
+
+function emailFooterText(payload: NewAlertsPayload): string {
+  const lines = ["You received this because a monitored page changed."];
+  const first = payload.alerts[0];
+  if (first?.targetId && payload.site.id) {
+    lines.push(
+      `Edit this target: ${targetEditDeepLink(payload.appBaseUrl, payload.site.id, first.targetId)}`,
+    );
+  }
+  const postfix = alertPostfix();
+  if (postfix) lines.push(formatAttributionPlain(postfix));
+  return lines.join("\n");
+}
+
 function emailFooterHtml(payload: NewAlertsPayload): string {
   const first = payload.alerts[0];
   const editLink =
@@ -272,13 +293,21 @@ function emailFooterHtml(payload: NewAlertsPayload): string {
 </p>`
     : "";
 
-  return `<p style="margin:0;font-size:12px;color:#a3a3a3;">You received this because a monitored page changed.</p>${editLine}`;
+  return `<p style="margin:0;font-size:12px;color:#a3a3a3;">You received this because a monitored page changed.</p>${editLine}${postfixFooterHtml()}`;
+}
+
+function payloadForEmailBody(payload: NewAlertsPayload): NewAlertsPayload {
+  return {
+    ...payload,
+    alerts: payload.alerts.map((a) => ({ ...a, title: stripAlertPostfix(a.title) })),
+  };
 }
 
 export function renderNewAlertsEmail(payload: NewAlertsPayload): { html: string; text: string } {
+  const bodyPayload = payloadForEmailBody(payload);
   return {
     html: formatNewAlertsEmailHtml(payload),
-    text: formatNewAlertsEmailText(payload),
+    text: `${formatNewAlertsEmailText(bodyPayload)}\n\n${emailFooterText(payload)}`,
   };
 }
 

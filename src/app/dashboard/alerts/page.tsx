@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { AlertItem } from "@/components/alert-item";
 import { websiteOwnerAccessible } from "@/lib/account-access";
 import { MarkAllAlertsReadButton } from "@/components/mark-all-alerts-read-button";
+import { alertAttributionText, alertTitleForDisplay } from "@/lib/alert-display";
 
 export default async function AlertsPage({
   searchParams,
@@ -14,6 +15,7 @@ export default async function AlertsPage({
   const user = await requireUser();
   const { alert: alertParam, diff: diffParam } = await searchParams;
   const wantDiffScroll = diffParam === "1" || diffParam === "true";
+  const attribution = alertAttributionText();
 
   const [rows, unreadRow] = await Promise.all([
     db
@@ -67,6 +69,8 @@ export default async function AlertsPage({
               <AlertItem
                 key={alert.id}
                 alert={alert}
+                titleLabel={alertTitleForDisplay(alert.title)}
+                attribution={attribution}
                 highlighted={alertParam !== undefined && alert.id === alertParam}
                 scrollToDiff={wantDiffScroll && alertParam === alert.id}
                 website={{

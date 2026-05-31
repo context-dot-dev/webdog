@@ -17,6 +17,7 @@ import { buildProductPriceSeries } from "@/lib/product-price-history";
 import { buildFetchHistoryForTarget } from "@/lib/target-fetch-history";
 import { MarkAllAlertsReadButton } from "@/components/mark-all-alerts-read-button";
 import { resolveAiSummaryConfig } from "@/lib/ai-change-summary";
+import { alertAttributionText, alertTitleForDisplay } from "@/lib/alert-display";
 export default async function WebsiteDetailPage({
   params,
   searchParams,
@@ -84,6 +85,7 @@ export default async function WebsiteDetailPage({
   );
 
   const unreadAlertsCount = unreadAlertsCountRow[0]?.n ?? 0;
+  const attribution = alertAttributionText();
 
   // Derive last-run status. All targets touched in a single runWebsiteChecks()
   // batch get their lastCheckedAt set together, so the max is the run timestamp.
@@ -239,6 +241,8 @@ export default async function WebsiteDetailPage({
               <AlertItem
                 key={a.id}
                 alert={a}
+                titleLabel={alertTitleForDisplay(a.title)}
+                attribution={attribution}
                 highlighted={a.id === highlightedAlertId}
                 scrollToDiff={Boolean(wantDiffScroll && a.id === highlightedAlertId)}
               />

@@ -16,7 +16,6 @@ import { parseResendToEmails, sendResendEmail } from "@/lib/notify-resend";
 import { APP_NAME } from "@/lib/product-info";
 import { formatNewAlertsEmailSubject } from "@/lib/notification-new-alerts";
 import {
-  appendAlertPostfix,
   effectiveResendApiKey,
   effectiveResendSendFromEmail,
   isResendApiKeyManagedByEnv,
@@ -101,7 +100,7 @@ export async function POST(req: Request) {
       apiKey: key,
       from,
       to,
-      subject: appendAlertPostfix(`${formatNewAlertsEmailSubject(samplePayload)} (test)`),
+      subject: `${formatNewAlertsEmailSubject(samplePayload)} (test)`,
       text: `${EMAIL_TEST_TEXT}\n\n---\n\n${text}`,
       html,
     });

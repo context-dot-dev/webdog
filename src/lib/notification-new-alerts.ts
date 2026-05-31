@@ -2,8 +2,10 @@
  * Shared structure for "new alerts" notifications across Slack and email.
  */
 
+import { formatAttributionPlain, formatAttributionSlackMrkdwn } from "./alert-postfix";
 import { parseDiff } from "./diff-display";
 import { APP_NAME, NEW_ALERTS_EVENT_TYPE } from "./product-info";
+import { alertPostfix, stripAlertPostfix } from "./server-managed-config";
 
 export type NewAlertsSite = { id: string; name: string; domain: string };
 
@@ -38,6 +40,8 @@ export type NewAlertsWebhookBody = {
   alerts: (NewAlertsAlert & { dashboardUrl: string })[];
   /** Same human-readable summary as the Slack fallback text / email. */
   summaryText: string;
+  /** Optional deployment attribution (POSTFIX_TO_ALERTS), separate from alert titles. */
+  attributionText?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -58,6 +62,7 @@ type SlackButtonElement = {
 export type SlackBlock =
   | { type: "header"; text: { type: "plain_text"; text: string; emoji?: boolean } }
   | { type: "section"; text: SlackTextObject }
+  | { type: "context"; elements: Array<{ type: "mrkdwn"; text: string }> }
   | { type: "divider" }
   | { type: "actions"; elements: SlackButtonElement[] };
 
@@ -87,6 +92,16 @@ function formatSummaryForSlack(summary: string | undefined): string {
 function formatSummaryForPlain(summary: string | undefined): string {
   if (!summary?.trim()) return "";
   return `Summary: ${trunc(summary.trim(), 400)}`;
+}
+
+function displayAlertTitle(title: string): string {
+  return stripAlertPostfix(title);
+}
+
+function notificationAttributionFooterPlain(): string {
+  const postfix = alertPostfix();
+  if (!postfix) return "";
+  return `\n\n${formatAttributionPlain(postfix)}`;
 }
 
 /**
@@ -221,7 +236,7 @@ export function buildNewAlertsSlackBlocks(payload: NewAlertsPayload): SlackBlock
     const { lines: diffLines, hasMore, totalChanges } = buildDiffMrkdwnLines(a);
     const url = alertDashboardDeepLink(appBaseUrl, a.id);
 
-    let sectionText = `*<${url}|${escSlackLinkLabel(trunc(a.title, 200))}>*`;
+    let sectionText = `*<${url}|${escSlackLinkLabel(trunc(displayAlertTitle(a.title), 200))}>*`;
     const summaryLine = formatSummaryForSlack(a.aiChangeSummary);
     if (summaryLine) sectionText += "\n" + summaryLine;
     if (diffLines.length > 0) sectionText += "\n" + diffLines.join("\n");
@@ -258,6 +273,14 @@ export function buildNewAlertsSlackBlocks(payload: NewAlertsPayload): SlackBlock
     text: { type: "mrkdwn", text: `<${openUrl}|Open in ${APP_NAME}>` },
   });
 
+  const postfix = alertPostfix();
+  if (postfix) {
+    blocks.push({
+      type: "context",
+      elements: [{ type: "mrkdwn", text: formatAttributionSlackMrkdwn(esc(postfix)) }],
+    });
+  }
+
   return blocks;
 }
 
@@ -280,7 +303,7 @@ export function formatNewAlertsSlackText(payload: NewAlertsPayload): string {
     .map((a) => {
       const { lines: diffLines, hasMore, totalChanges } = buildDiffMrkdwnLines(a);
       const deep = alertDashboardDeepLink(appBaseUrl, a.id);
-      let text = `• ${trunc(a.title, 200)}\n<${deep}|Open alert & diff>`;
+      let text = `• ${trunc(displayAlertTitle(a.title), 200)}\n<${deep}|Open alert & diff>`;
       const summaryPlain = formatSummaryForPlain(a.aiChangeSummary);
       if (summaryPlain) text += `\n${summaryPlain}`;
       if (diffLines.length > 0) {
@@ -293,11 +316,12 @@ export function formatNewAlertsSlackText(payload: NewAlertsPayload): string {
     .join("\n\n");
   const more = n > maxAlerts ? `\n… and ${n - maxAlerts} more` : "";
 
-  return `${APP_NAME}: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}`;
+  return `${APP_NAME}: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}${notificationAttributionFooterPlain()}`;
 }
 
 export function buildNewAlertsWebhookBody(payload: NewAlertsPayload): NewAlertsWebhookBody {
   const { appBaseUrl, alerts } = payload;
+  const postfix = alertPostfix();
   return {
     type: NEW_ALERTS_EVENT_TYPE,
     version: 1,
@@ -306,9 +330,11 @@ export function buildNewAlertsWebhookBody(payload: NewAlertsPayload): NewAlertsW
     site: payload.site,
     alerts: alerts.map((a) => ({
       ...a,
+      title: displayAlertTitle(a.title),
       dashboardUrl: alertDashboardDeepLink(appBaseUrl, a.id),
     })),
     summaryText: formatNewAlertsSlackText(payload),
+    ...(postfix ? { attributionText: postfix } : {}),
   };
 }
 
@@ -333,13 +359,13 @@ export function formatNewAlertsEmailText(payload: NewAlertsPayload): string {
       const { addLines, delLines, totalChanges } = parseDiffLines(a);
       const summaryPlain = formatSummaryForPlain(a.aiChangeSummary);
       if (totalChanges === 0) {
-        const parts = [`• ${trunc(a.title, 200)}`, `  Open in app: ${deeplink}`];
+        const parts = [`• ${trunc(displayAlertTitle(a.title), 200)}`, `  Open in app: ${deeplink}`];
         if (summaryPlain) parts.push(`  ${summaryPlain}`);
         return parts.join("\n");
       }
 
       const hasMore = totalChanges > INLINE_CHANGE_LIMIT;
-      const parts: string[] = [`• ${trunc(a.title, 200)}`, `  Open in app: ${deeplink}`];
+      const parts: string[] = [`• ${trunc(displayAlertTitle(a.title), 200)}`, `  Open in app: ${deeplink}`];
       if (summaryPlain) parts.push(`  ${summaryPlain}`);
 
       if (!hasMore) {
@@ -362,7 +388,7 @@ export function formatNewAlertsEmailText(payload: NewAlertsPayload): string {
     .join("\n\n");
   const more = n > maxAlerts ? `\n… and ${n - maxAlerts} more` : "";
 
-  return `${APP_NAME}: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}`;
+  return `${APP_NAME}: ${n} new change(s) for ${site.name} (${site.domain})\n\n${lines}${more}\n\nOpen: ${openUrl}${notificationAttributionFooterPlain()}`;
 }
 
 /** Backwards-compatible helper matching the previous notify-slack signature. */
