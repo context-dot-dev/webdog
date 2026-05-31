@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
-import { normalizeDomain } from "@/lib/context-client";
+import { normalizeDomain } from "@/lib/domain";
 import {
   buildInitialPageUrl,
   parseWebsiteUrlInput,
