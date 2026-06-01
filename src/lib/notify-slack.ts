@@ -50,4 +50,3 @@ export async function postSlackIncomingWebhook(
   }
 }
 
-export { buildNewAlertsSlackText } from "./notification-new-alerts";

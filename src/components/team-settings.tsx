@@ -38,25 +38,28 @@ export function TeamSettings() {
 
   const load = useCallback(async () => {
     setError(null);
-    const [ir, mr] = await Promise.all([
-      fetch("/api/account/invites", { cache: "no-store" }),
-      fetch("/api/account/members", { cache: "no-store" }),
-    ]);
-    if (!ir.ok) {
-      setError(await parseErrorMessage(ir));
+    try {
+      const [ir, mr] = await Promise.all([
+        fetch("/api/account/invites", { cache: "no-store" }),
+        fetch("/api/account/members", { cache: "no-store" }),
+      ]);
+      if (!ir.ok) {
+        setError(await parseErrorMessage(ir));
+        return;
+      }
+      if (!mr.ok) {
+        setError(await parseErrorMessage(mr));
+        return;
+      }
+      const ij = (await ir.json()) as { invites: InviteRow[] };
+      const mj = (await mr.json()) as { members: MemberRow[] };
+      setInvites(ij.invites);
+      setMembers(mj.members);
+    } catch {
+      setError("Could not load team settings");
+    } finally {
       setLoading(false);
-      return;
     }
-    if (!mr.ok) {
-      setError(await parseErrorMessage(mr));
-      setLoading(false);
-      return;
-    }
-    const ij = (await ir.json()) as { invites: InviteRow[] };
-    const mj = (await mr.json()) as { members: MemberRow[] };
-    setInvites(ij.invites);
-    setMembers(mj.members);
-    setLoading(false);
   }, []);
 
   useEffect(() => {
