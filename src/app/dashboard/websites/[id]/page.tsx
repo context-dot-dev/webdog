@@ -14,7 +14,9 @@ import { parseTimestamp } from "@/lib/parse-timestamp";
 import { RelativeTime } from "@/components/relative-time";
 import { ExpandableText } from "@/components/expandable-text";
 import { buildProductPriceSeries } from "@/lib/product-price-history";
-import { buildFetchHistoryForTarget } from "@/lib/target-fetch-history";
+import { buildFetchHistoryForTarget, latestContentForTarget } from "@/lib/target-fetch-history";
+import { LastCheckPanel, type LastCheckItem } from "@/components/last-check-panel";
+import { TARGET_KIND_LABEL } from "@/components/target-kind";
 import { MarkAllAlertsReadButton } from "@/components/mark-all-alerts-read-button";
 import { resolveAiSummaryConfig } from "@/lib/ai-change-summary";
 import { alertAttributionText, alertTitleForDisplay } from "@/lib/alert-display";
@@ -86,6 +88,13 @@ export default async function WebsiteDetailPage({
 
   const unreadAlertsCount = unreadAlertsCountRow[0]?.n ?? 0;
   const attribution = alertAttributionText();
+
+  const lastCheckItems: LastCheckItem[] = targets.map((t) => ({
+    id: t.id,
+    kind: t.kind,
+    title: t.kind === "SITEMAP_LINKS" ? TARGET_KIND_LABEL.SITEMAP_LINKS : (t.pageUrl ?? website.url),
+    content: latestContentForTarget(t, recentSnapshots),
+  }));
 
   // Derive last-run status. All targets touched in a single runWebsiteChecks()
   // batch get their lastCheckedAt set together, so the max is the run timestamp.
@@ -172,6 +181,7 @@ export default async function WebsiteDetailPage({
           targetsInLastRun={targetsInLastRun}
           enabledTargetCount={enabledTargets.length}
           alertsInLastRun={alertsInLastRun}
+          items={lastCheckItems}
         />
       </section>
 
@@ -320,62 +330,6 @@ export default async function WebsiteDetailPage({
             )}
         </div>
       </section>
-    </div>
-  );
-}
-
-function LastCheckPanel({
-  lastRunAt,
-  targetsInLastRun,
-  enabledTargetCount,
-  alertsInLastRun,
-}: {
-  lastRunAt: number | null;
-  targetsInLastRun: number;
-  enabledTargetCount: number;
-  alertsInLastRun: number;
-}) {
-  if (!lastRunAt) {
-    return (
-      <div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 ring-1 ring-neutral-950/5">
-        <span className="inline-flex size-2 rounded-full bg-neutral-300" aria-hidden />
-        <div className="text-sm text-neutral-600">
-          No checks have run yet.{" "}
-          {enabledTargetCount === 0
-            ? "Add a target to start watching."
-            : "The worker will run shortly, or use Run now."}
-        </div>
-      </div>
-    );
-  }
-
-  const clean = alertsInLastRun === 0;
-  const dotClass = clean ? "bg-emerald-500" : "bg-amber-500";
-  const resultLabel = clean
-    ? "All clear — no changes detected"
-    : `${alertsInLastRun} change${alertsInLastRun === 1 ? "" : "s"} detected`;
-  const resultClass = clean ? "text-emerald-700" : "text-amber-700";
-
-  return (
-    <div className="rounded-2xl bg-white px-5 py-4 ring-1 ring-neutral-950/5 sm:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <div className="flex items-center gap-3">
-          <span className={`inline-flex size-2 rounded-full ${dotClass}`} aria-hidden />
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Last check
-            </div>
-            <div className="mt-0.5 text-sm text-neutral-900">
-              <RelativeTime date={new Date(lastRunAt)} />
-              <span className="ml-2 text-neutral-500">
-                · {targetsInLastRun} of {enabledTargetCount} target
-                {enabledTargetCount === 1 ? "" : "s"} checked
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className={`text-sm font-medium ${resultClass}`}>{resultLabel}</div>
-      </div>
     </div>
   );
 }
