@@ -9,13 +9,14 @@ import { websiteOwnerAccessible } from "@/lib/account-access";
 import { MonitorCard, type MonitorAlert } from "@/components/monitor-card";
 import { RunNowButton } from "@/components/run-now-button";
 import { DeleteWebsiteButton } from "@/components/delete-website-button";
-import { parseTimestamp } from "@/lib/parse-timestamp";
-import { RelativeTime } from "@/components/relative-time";
 import { ExpandableText } from "@/components/expandable-text";
+import { WebsiteStatusChip } from "@/components/website-status-chip";
+import { ShareWebsiteButton } from "@/components/share-website-button";
 import { buildProductPriceSeries } from "@/lib/product-price-history";
 import { latestContentForTarget } from "@/lib/target-fetch-history";
 import { resolveAiSummaryConfig } from "@/lib/ai-change-summary";
 import { alertAttributionText, alertTitleForDisplay } from "@/lib/alert-display";
+import { isResendApiKeyManagedByEnv, isResendSendFromEmailManagedByEnv } from "@/lib/server-managed-config";
 
 export default async function WebsiteDetailPage({
   params,
@@ -77,6 +78,8 @@ export default async function WebsiteDetailPage({
   );
 
   const attribution = alertAttributionText();
+  const resendApiKeyManaged = isResendApiKeyManagedByEnv();
+  const resendSendFromEmailManaged = isResendSendFromEmailManagedByEnv();
 
   const changesByTarget = new Map<string, MonitorAlert[]>();
   for (const a of alerts) {
@@ -128,6 +131,7 @@ export default async function WebsiteDetailPage({
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ShareWebsiteButton websiteId={website.id} initialShareToken={website.publicShareToken} />
               <RunNowButton websiteId={website.id} />
               <DeleteWebsiteButton websiteId={website.id} />
             </div>
@@ -150,7 +154,7 @@ export default async function WebsiteDetailPage({
             )}
 
             <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-              <StatusChip lastRunAt={lastRunAt} unreadCount={unreadCount} />
+              <WebsiteStatusChip lastRunAt={lastRunAt} unreadCount={unreadCount} />
               <span className="text-neutral-500">
                 {enabledTargets.length} of {targets.length} monitor
                 {targets.length === 1 ? "" : "s"} active
@@ -193,6 +197,8 @@ export default async function WebsiteDetailPage({
                 productPriceHistory={buildProductPriceSeries(t, recentSnapshots)}
                 aiSummaryConfigured={aiSummaryConfigured}
                 attribution={attribution}
+                resendApiKeyManaged={resendApiKeyManaged}
+                resendSendFromEmailManaged={resendSendFromEmailManaged}
                 highlightEdit={wantTargetEdit && t.id === highlightedTargetId}
               />
             ))}
@@ -203,29 +209,3 @@ export default async function WebsiteDetailPage({
   );
 }
 
-function StatusChip({ lastRunAt, unreadCount }: { lastRunAt: number | null; unreadCount: number }) {
-  if (!lastRunAt) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 font-medium text-neutral-600">
-        <span className="size-1.5 rounded-full bg-neutral-400" aria-hidden />
-        No checks yet
-      </span>
-    );
-  }
-  const clean = unreadCount === 0;
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ring-1 ring-inset ${
-        clean
-          ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
-          : "bg-amber-50 text-amber-800 ring-amber-600/20"
-      }`}
-    >
-      <span className={`size-1.5 rounded-full ${clean ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden />
-      {clean ? "All clear" : `${unreadCount} unread change${unreadCount === 1 ? "" : "s"}`}
-      <span className="font-normal opacity-70">
-        · checked <RelativeTime date={new Date(lastRunAt)} />
-      </span>
-    </span>
-  );
-}

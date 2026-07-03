@@ -3,10 +3,11 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Alert, LinkScope, NotificationChannel, Target } from "@/lib/db/schema";
+import type { Alert, LinkScope, Target } from "@/lib/db/schema";
 import type { TargetCurrentContent as TargetCurrentContentData } from "@/lib/target-fetch-history";
 import { TargetCurrentContent } from "./target-current-content";
 import { KindBadge } from "./target-kind";
+import { MonitorStatusPill } from "./monitor-status-pill";
 import { ChevronIcon } from "./chevron-icon";
 import { AlertItem } from "./alert-item";
 import { parseTimestamp } from "@/lib/parse-timestamp";
@@ -14,6 +15,7 @@ import { RelativeTime } from "./relative-time";
 import type { WebsiteDestOption } from "./website-notification-destinations";
 import { TARGET_FORM_DASHBOARD_ONLY } from "@/lib/website-notification-destinations";
 import { ProductPriceHistoryPanel } from "./product-price-history-panel";
+import { AlertRoutingField } from "./alert-routing-field";
 import { RunNowButton } from "./run-now-button";
 import type { ProductPricePoint } from "@/lib/product-price-history";
 import { CHECK_FREQUENCY_PRESET_HOURS, checkFrequencyLabel } from "@/lib/check-frequency-presets";
@@ -44,12 +46,6 @@ function targetUrlPresentation(
   return { href, label: href };
 }
 
-function channelLabel(c: NotificationChannel): string {
-  if (c === "SLACK") return "Slack";
-  if (c === "EMAIL") return "Email";
-  return "Webhook";
-}
-
 const LINK_SCOPE_OPTIONS: { value: LinkScope; label: string }[] = [
   { value: "NEW", label: "New links only" },
   { value: "REMOVED", label: "Removed links only" },
@@ -77,37 +73,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function StatusPill({
-  hasRun,
-  latestChangeAt,
-}: {
-  hasRun: boolean;
-  latestChangeAt: number | null;
-}) {
-  if (!hasRun) {
-    return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600">
-        <span className="size-1.5 rounded-full bg-neutral-400" aria-hidden />
-        Waiting for first check
-      </span>
-    );
-  }
-  if (latestChangeAt) {
-    return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-600/20 ring-inset">
-        <span className="size-1.5 rounded-full bg-amber-500" aria-hidden />
-        Changed <RelativeTime date={new Date(latestChangeAt)} />
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
-      <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
-      Up to date
-    </span>
-  );
-}
-
 export function MonitorCard({
   target,
   websiteId,
@@ -118,6 +83,8 @@ export function MonitorCard({
   productPriceHistory,
   aiSummaryConfigured,
   attribution,
+  resendApiKeyManaged,
+  resendSendFromEmailManaged,
   highlightEdit,
 }: {
   target: Target;
@@ -130,6 +97,8 @@ export function MonitorCard({
   productPriceHistory: ProductPricePoint[];
   aiSummaryConfigured: boolean;
   attribution: string | null;
+  resendApiKeyManaged: boolean;
+  resendSendFromEmailManaged: boolean;
   highlightEdit?: boolean;
 }) {
   const router = useRouter();
@@ -137,7 +106,6 @@ export function MonitorCard({
   const cardRef = useRef<HTMLLIElement>(null);
   const [enabled, setEnabled] = useState(target.enabled);
   const [checkIntervalHours, setCheckIntervalHours] = useState(target.checkIntervalHours ?? 1);
-  const [outboundRouting, setOutboundRouting] = useState(() => deriveOutboundRouting(target));
   const [linkScope, setLinkScope] = useState<LinkScope>(() => coerceLinkScope(target.linkScope));
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(target.aiChangeSummaryEnabled ?? false);
   const [busy, setBusy] = useState(false);
@@ -156,7 +124,6 @@ export function MonitorCard({
   useEffect(() => {
     setEnabled(target.enabled);
     setCheckIntervalHours(target.checkIntervalHours ?? 1);
-    setOutboundRouting(deriveOutboundRouting(target));
     setLinkScope(coerceLinkScope(target.linkScope));
     setAiSummaryEnabled(target.aiChangeSummaryEnabled ?? false);
   }, [target]);
@@ -210,14 +177,6 @@ export function MonitorCard({
     if (await patch({ aiChangeSummaryEnabled: next })) setAiSummaryEnabled(next);
   }
 
-  async function setOutboundRoutingPreference(nextSel: string) {
-    const body =
-      nextSel === TARGET_FORM_DASHBOARD_ONLY
-        ? { externalNotify: false, notificationDestinationId: null }
-        : { externalNotify: true, notificationDestinationId: nextSel };
-    if (await patch(body)) setOutboundRouting(nextSel);
-  }
-
   return (
     <li
       ref={cardRef}
@@ -241,7 +200,7 @@ export function MonitorCard({
           </a>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <StatusPill hasRun={Boolean(target.lastCheckedAt)} latestChangeAt={latestChangeAt} />
+          <MonitorStatusPill hasRun={Boolean(target.lastCheckedAt)} latestChangeAt={latestChangeAt} />
           <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-neutral-600">
             <span className="sr-only">Enabled</span>
             <span
@@ -340,7 +299,7 @@ export function MonitorCard({
           id={settingsId}
           className="border-t border-neutral-950/5 bg-neutral-50/50 px-4 py-4 sm:px-5"
         >
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Check frequency">
               <select
                 className={SELECT_CLASS}
@@ -352,23 +311,6 @@ export function MonitorCard({
                 {hourOptions.map((h) => (
                   <option key={h} value={h}>
                     {checkFrequencyLabel(h)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Alert routing">
-              <select
-                className={SELECT_CLASS}
-                value={outboundRouting}
-                disabled={busy}
-                onChange={(e) => void setOutboundRoutingPreference(e.target.value)}
-                aria-label="Where alerts go for this monitor"
-              >
-                <option value={TARGET_FORM_DASHBOARD_ONLY}>None (dashboard only)</option>
-                {destinations.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} ({channelLabel(d.channel)})
                   </option>
                 ))}
               </select>
@@ -391,6 +333,16 @@ export function MonitorCard({
                 </select>
               </Field>
             )}
+          </div>
+
+          <div className="mt-3">
+            <AlertRoutingField
+              targetId={target.id}
+              initialDestinations={destinations}
+              initialValue={deriveOutboundRouting(target)}
+              resendApiKeyManaged={resendApiKeyManaged}
+              resendSendFromEmailManaged={resendSendFromEmailManaged}
+            />
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">

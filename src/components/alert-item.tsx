@@ -38,6 +38,7 @@ export function AlertItem({
   website,
   titleLabel,
   attribution,
+  readOnly,
 }: {
   alert: Alert;
   highlighted?: boolean;
@@ -49,6 +50,8 @@ export function AlertItem({
   titleLabel?: string;
   /** Optional deployment attribution shown in the expanded footer. */
   attribution?: string | null;
+  /** Public/view-only: expand to read the diff, but never mark read or hit the API. */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(highlighted ?? false);
@@ -76,7 +79,7 @@ export function AlertItem({
   const details = safeParse(alert.details);
 
   async function markRead() {
-    if (read) return;
+    if (read || readOnly) return;
     setBusy(true);
     const res = await fetch(`/api/alerts/${alert.id}`, {
       method: "PATCH",
@@ -90,10 +93,11 @@ export function AlertItem({
     }
   }
 
+  const showUnread = !read && !readOnly;
   const shellCls = [
     "transition-colors",
     highlighted ? "ring-1 ring-inset ring-neutral-950/10" : "",
-    read ? "bg-white" : "bg-white shadow-[inset_3px_0_0_0_theme(colors.brand.500)]",
+    showUnread ? "bg-white shadow-[inset_3px_0_0_0_theme(colors.brand.500)]" : "bg-white",
     "hover:bg-neutral-950/[0.02]",
   ].join(" ");
 
@@ -112,7 +116,7 @@ export function AlertItem({
         }}
       >
         <span className="shrink-0" aria-hidden>
-          <span className={`block rounded-full ${read ? "size-1.5 bg-neutral-300" : "size-2 bg-brand-500"}`} />
+          <span className={`block rounded-full ${showUnread ? "size-2 bg-brand-500" : "size-1.5 bg-neutral-300"}`} />
         </span>
         {website && (
           <Link

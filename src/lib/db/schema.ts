@@ -144,6 +144,8 @@ export const website = pgTable(
      * Use `[]` to disable notifications for this site.
      */
     notificationDestinationIds: text("notificationDestinationIds"),
+    /** Unguessable token for a read-only public view; null = not shared. */
+    publicShareToken: text("publicShareToken").unique(),
     createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
       .defaultNow(),
