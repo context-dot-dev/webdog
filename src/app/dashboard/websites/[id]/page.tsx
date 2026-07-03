@@ -1,37 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { requireUser } from "@/lib/session";
 import { AddTargetDialog } from "@/components/add-target-dialog";
 import { websiteOwnerAccessible } from "@/lib/account-access";
-import { TargetRow } from "@/components/target-row";
-import { AlertItem } from "@/components/alert-item";
+import { MonitorCard, type MonitorAlert } from "@/components/monitor-card";
 import { RunNowButton } from "@/components/run-now-button";
 import { DeleteWebsiteButton } from "@/components/delete-website-button";
 import { parseTimestamp } from "@/lib/parse-timestamp";
 import { RelativeTime } from "@/components/relative-time";
 import { ExpandableText } from "@/components/expandable-text";
 import { buildProductPriceSeries } from "@/lib/product-price-history";
-import { buildFetchHistoryForTarget, latestContentForTarget } from "@/lib/target-fetch-history";
-import { LastCheckPanel, type LastCheckItem } from "@/components/last-check-panel";
-import { TARGET_KIND_LABEL } from "@/components/target-kind";
-import { MarkAllAlertsReadButton } from "@/components/mark-all-alerts-read-button";
+import { latestContentForTarget } from "@/lib/target-fetch-history";
 import { resolveAiSummaryConfig } from "@/lib/ai-change-summary";
 import { alertAttributionText, alertTitleForDisplay } from "@/lib/alert-display";
+
 export default async function WebsiteDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ alert?: string; diff?: string; target?: string; edit?: string }>;
+  searchParams: Promise<{ target?: string; edit?: string }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
-  const { alert: highlightedAlertId, diff: diffParam, target: highlightedTargetId, edit: editParam } =
-    await searchParams;
-  const wantDiffScroll = diffParam === "1" || diffParam === "true";
+  const { target: highlightedTargetId, edit: editParam } = await searchParams;
   const wantTargetEdit = editParam === "1" || editParam === "true";
 
   const [website] = await db
@@ -41,14 +36,9 @@ export default async function WebsiteDetailPage({
     .limit(1);
   if (!website) notFound();
 
-  const [targets, alerts, unreadAlertsCountRow, recentSnapshots, notificationDestChoices, aiSettings] =
-    await Promise.all([
+  const [targets, alerts, recentSnapshots, notificationDestChoices, aiSettings] = await Promise.all([
     db.select().from(schema.target).where(eq(schema.target.websiteId, id)).orderBy(desc(schema.target.createdAt)),
-    db.select().from(schema.alert).where(eq(schema.alert.websiteId, id)).orderBy(desc(schema.alert.createdAt)).limit(50),
-    db
-      .select({ n: sql<number>`count(*)`.mapWith(Number) })
-      .from(schema.alert)
-      .where(and(eq(schema.alert.websiteId, id), eq(schema.alert.read, false))),
+    db.select().from(schema.alert).where(eq(schema.alert.websiteId, id)).orderBy(desc(schema.alert.createdAt)).limit(100),
     db
       .select()
       .from(schema.snapshot)
@@ -86,33 +76,21 @@ export default async function WebsiteDetailPage({
       }),
   );
 
-  const unreadAlertsCount = unreadAlertsCountRow[0]?.n ?? 0;
   const attribution = alertAttributionText();
 
-  const lastCheckItems: LastCheckItem[] = targets.map((t) => ({
-    id: t.id,
-    kind: t.kind,
-    title: t.kind === "SITEMAP_LINKS" ? TARGET_KIND_LABEL.SITEMAP_LINKS : (t.pageUrl ?? website.url),
-    content: latestContentForTarget(t, recentSnapshots),
-  }));
+  const changesByTarget = new Map<string, MonitorAlert[]>();
+  for (const a of alerts) {
+    const list = changesByTarget.get(a.targetId) ?? [];
+    list.push({ alert: a, titleLabel: alertTitleForDisplay(a.title) });
+    changesByTarget.set(a.targetId, list);
+  }
 
-  // Derive last-run status. All targets touched in a single runWebsiteChecks()
-  // batch get their lastCheckedAt set together, so the max is the run timestamp.
-  // Anything within RUN_WINDOW_MS of that timestamp is part of the same run.
-  const RUN_WINDOW_MS = 5 * 60 * 1000;
   const enabledTargets = targets.filter((t) => t.enabled);
   const checkedTimestamps = targets
     .map((t) => (t.lastCheckedAt ? Number(t.lastCheckedAt) : null))
     .filter((v): v is number => v !== null);
   const lastRunAt = checkedTimestamps.length ? Math.max(...checkedTimestamps) : null;
-  const targetsInLastRun = lastRunAt
-    ? targets.filter(
-        (t) => t.lastCheckedAt && lastRunAt - Number(t.lastCheckedAt) <= RUN_WINDOW_MS,
-      ).length
-    : 0;
-  const alertsInLastRun = lastRunAt
-    ? alerts.filter((a) => Math.abs(Number(a.createdAt) - lastRunAt) <= RUN_WINDOW_MS).length
-    : 0;
+  const unreadCount = alerts.filter((a) => !a.read).length;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-12">
@@ -170,26 +148,25 @@ export default async function WebsiteDetailPage({
             {website.description && (
               <ExpandableText text={website.description} className="mt-3 max-w-2xl" />
             )}
+
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+              <StatusChip lastRunAt={lastRunAt} unreadCount={unreadCount} />
+              <span className="text-neutral-500">
+                {enabledTargets.length} of {targets.length} monitor
+                {targets.length === 1 ? "" : "s"} active
+              </span>
+            </div>
           </div>
         </div>
       </header>
 
       <section className="mt-8">
-        <h2 className="sr-only">Last check</h2>
-        <LastCheckPanel
-          lastRunAt={lastRunAt}
-          targetsInLastRun={targetsInLastRun}
-          enabledTargetCount={enabledTargets.length}
-          alertsInLastRun={alertsInLastRun}
-          items={lastCheckItems}
-        />
-      </section>
-
-      <section className="mt-10">
-        <div className="flex items-end justify-between">
+        <div className="flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold text-neutral-900">Targets</h2>
-            <p className="mt-1 text-sm text-neutral-600">What should trigger an alert for this site.</p>
+            <h2 className="text-base font-semibold text-neutral-900">Your WebDogs</h2>
+            <p className="mt-1 text-sm text-neutral-600">
+              Each watcher watches something specific and shows its changes here.
+            </p>
           </div>
           <AddTargetDialog
             websiteId={website.id}
@@ -200,136 +177,55 @@ export default async function WebsiteDetailPage({
 
         {targets.length === 0 ? (
           <div className="mt-4 rounded-2xl bg-white p-10 text-center ring-1 ring-neutral-950/5">
-            <p className="text-sm text-neutral-600">No targets yet. Add one to start watching.</p>
+            <p className="text-sm text-neutral-600">No monitors yet. Add one to start watching.</p>
           </div>
         ) : (
-          <ul role="list" className="mt-4 divide-y divide-neutral-950/5 overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-950/5">
+          <ul role="list" className="mt-4 space-y-4">
             {targets.map((t) => (
-              <TargetRow
+              <MonitorCard
                 key={t.id}
                 target={t}
                 websiteId={website.id}
-                destinations={notificationDestChoices}
                 websiteUrl={website.url}
-                fetchHistory={buildFetchHistoryForTarget(t, recentSnapshots)}
+                destinations={notificationDestChoices}
+                changes={changesByTarget.get(t.id) ?? []}
+                currentContent={latestContentForTarget(t, recentSnapshots)}
                 productPriceHistory={buildProductPriceSeries(t, recentSnapshots)}
                 aiSummaryConfigured={aiSummaryConfigured}
+                attribution={attribution}
                 highlightEdit={wantTargetEdit && t.id === highlightedTargetId}
               />
             ))}
           </ul>
         )}
       </section>
-
-      <section className="mt-12" aria-labelledby="alerts-heading">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 id="alerts-heading" className="text-base font-semibold text-neutral-900">
-              Alerts
-            </h2>
-            <p className="mt-1 text-sm text-neutral-600">
-              The most recent alerts for this website.{" "}
-              {alerts[0] && (
-                <>
-                  Last change <RelativeTime date={parseTimestamp(alerts[0].createdAt)} />.
-                </>
-              )}
-            </p>
-          </div>
-          <MarkAllAlertsReadButton websiteId={id} unreadCount={unreadAlertsCount} />
-        </div>
-
-        {alerts.length === 0 ? (
-          <div className="mt-4 rounded-2xl bg-white p-10 text-center ring-1 ring-neutral-950/5">
-            <p className="text-sm text-neutral-600">
-              No changes detected yet. Alerts appear here once the worker completes its first comparison.
-            </p>
-          </div>
-        ) : (
-          <ul role="list" className="mt-4 divide-y divide-neutral-950/5 overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-950/5">
-            {alerts.map((a) => (
-              <AlertItem
-                key={a.id}
-                alert={a}
-                titleLabel={alertTitleForDisplay(a.title)}
-                attribution={attribution}
-                highlighted={a.id === highlightedAlertId}
-                scrollToDiff={Boolean(wantDiffScroll && a.id === highlightedAlertId)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="mt-12" aria-labelledby="activity-heading">
-        <div>
-          <h2 id="activity-heading" className="text-base font-semibold text-neutral-900">
-            Activity
-          </h2>
-          <p className="mt-1 text-sm text-neutral-600">
-            Fetches the worker made to context.dev (sitemap, page markdown, or product extraction), newest first. Each
-            row is a separate request; because targets can use different intervals, you will see a mix of timestamps as
-            each target becomes due. Not a substitute for full application logs in production.
-          </p>
-        </div>
-
-        <div className="mt-6">
-          <h3 className="text-sm font-medium text-neutral-900">Fetches</h3>
-          <p className="mt-0.5 text-xs text-neutral-500">Kind, target URL, and content hash (first 8 hex chars) for each stored result.</p>
-            {recentSnapshots.length === 0 ? (
-              <p className="mt-3 rounded-2xl bg-white px-4 py-6 text-sm text-neutral-600 ring-1 ring-neutral-950/5">
-                No fetches stored yet. They appear when a check runs and a sitemap, page, or product is actually
-                requested.
-              </p>
-            ) : (
-              <div className="mt-3 overflow-x-auto rounded-2xl ring-1 ring-neutral-950/5">
-                <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-neutral-950/5 bg-neutral-50/80 text-xs font-medium text-neutral-600">
-                      <th scope="col" className="whitespace-nowrap px-4 py-2.5 sm:pl-5">
-                        Time
-                      </th>
-                      <th scope="col" className="whitespace-nowrap px-2 py-2.5">
-                        Kind
-                      </th>
-                      <th scope="col" className="px-2 py-2.5 pr-4 sm:pr-5">
-                        Target URL
-                      </th>
-                      <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-mono text-xs sm:pr-5">
-                        Hash
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentSnapshots.map((s) => (
-                      <tr
-                        key={s.id}
-                        className="border-b border-neutral-950/5 last:border-b-0"
-                      >
-                        <td className="whitespace-nowrap px-4 py-2.5 align-top text-xs text-neutral-600 sm:pl-5">
-                          <RelativeTime date={parseTimestamp(s.createdAt)} />
-                        </td>
-                        <td className="px-2 py-2.5 align-top font-mono text-xs text-neutral-800">{s.kind}</td>
-                        <td className="max-w-0 py-2.5 align-top">
-                          {s.targetUrl ? (
-                            <span className="block truncate font-mono text-xs text-neutral-600" title={s.targetUrl}>
-                              {s.targetUrl}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-neutral-400">—</span>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2.5 align-top font-mono text-xs text-neutral-500 sm:pr-5">
-                          {s.hash.slice(0, 8)}…
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-        </div>
-      </section>
     </div>
+  );
+}
+
+function StatusChip({ lastRunAt, unreadCount }: { lastRunAt: number | null; unreadCount: number }) {
+  if (!lastRunAt) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 font-medium text-neutral-600">
+        <span className="size-1.5 rounded-full bg-neutral-400" aria-hidden />
+        No checks yet
+      </span>
+    );
+  }
+  const clean = unreadCount === 0;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ring-1 ring-inset ${
+        clean
+          ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
+          : "bg-amber-50 text-amber-800 ring-amber-600/20"
+      }`}
+    >
+      <span className={`size-1.5 rounded-full ${clean ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden />
+      {clean ? "All clear" : `${unreadCount} unread change${unreadCount === 1 ? "" : "s"}`}
+      <span className="font-normal opacity-70">
+        · checked <RelativeTime date={new Date(lastRunAt)} />
+      </span>
+    </span>
   );
 }

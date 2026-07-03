@@ -192,7 +192,7 @@ export function AddTargetDialog({
   return (
     <>
       <button type="button" onClick={() => void handleOpen()} disabled={opening} className="btn-accent">
-        <PlusIcon className="size-4" /> Add target
+        <PlusIcon className="size-4" /> Add
       </button>
       {open && (
         <div role="dialog" aria-modal="true" aria-label="Add target" className="fixed inset-0 z-50">
@@ -383,7 +383,7 @@ export function AddTargetDialog({
                       disabled={loading || routingPickIncomplete}
                       className="btn-accent"
                     >
-                      {loading ? "Adding…" : "Add target"}
+                      {loading ? "Adding…" : "Add"}
                     </button>
                   )}
                 </div>
