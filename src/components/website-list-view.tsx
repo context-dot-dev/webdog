@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AddWebsiteDialog } from "@/components/add-website-dialog";
+import { StarterTemplates } from "@/components/starter-templates";
 import { RelativeTime } from "@/components/relative-time";
 import { parseTimestamp } from "@/lib/parse-timestamp";
 import { APP_NAME } from "@/lib/product-info";
+import type { StarterTemplateWithLogo } from "@/lib/starter-templates";
 
 type Website = {
   id: string;
@@ -89,7 +91,13 @@ function ListIcon({ className }: { className?: string }) {
   );
 }
 
-export function WebsiteListView({ websites }: { websites: Website[] }) {
+export function WebsiteListView({
+  websites,
+  templates = [],
+}: {
+  websites: Website[];
+  templates?: StarterTemplateWithLogo[];
+}) {
   const [view, setView] = useState<ViewMode>("grid");
 
   useEffect(() => {
@@ -153,7 +161,7 @@ export function WebsiteListView({ websites }: { websites: Website[] }) {
 
       <section className="mt-8">
         {websites.length === 0 ? (
-          <EmptyState />
+          <EmptyState templates={templates} />
         ) : view === "grid" ? (
           <GridView websites={websites} />
         ) : (
@@ -337,19 +345,24 @@ function Stat({
   );
 }
 
-function EmptyState() {
+function EmptyState({ templates }: { templates: StarterTemplateWithLogo[] }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-3xl bg-white px-6 py-20 text-center ring-1 ring-neutral-900/5">
-      <div className="grid size-16 place-items-center rounded-3xl bg-peach text-3xl ring-1 ring-neutral-900/5">
-        🌱
+    <div className="mx-auto max-w-3xl rounded-3xl bg-white p-6 ring-1 ring-neutral-900/5 sm:p-8">
+      <div className="flex flex-col items-center text-center">
+        <h2 className="mt-3 text-base font-semibold text-neutral-900">Watch your first page</h2>
+        <p className="mt-1 max-w-[38ch] text-pretty text-sm text-neutral-600">
+          Add any site — we pull in its brand automatically and alert you the moment a page changes.
+        </p>
+        <div className="mt-4">
+          <AddWebsiteDialog />
+        </div>
       </div>
-      <h2 className="mt-5 text-lg font-semibold text-neutral-900">No websites yet</h2>
-      <p className="mt-2 max-w-[40ch] text-pretty text-sm text-neutral-600">
-        Add a website to start watching for new links, removed links, or content changes.
-      </p>
-      <div className="mt-6">
-        <AddWebsiteDialog />
-      </div>
+
+      {templates.length > 0 && (
+        <div className="mt-7">
+          <StarterTemplates templates={templates} />
+        </div>
+      )}
     </div>
   );
 }

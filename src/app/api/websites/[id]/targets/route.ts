@@ -7,6 +7,7 @@ import { notFound, parseJson, badRequest, requireApiUserWithWriteOwner } from "@
 import { websiteOwnerAccessible } from "@/lib/account-access";
 import { newId } from "@/lib/ids";
 import { monitorLimitError } from "@/lib/account-monitor-limits";
+import { isUrlWithinDomain } from "@/lib/domain";
 
 const createSchema = z.discriminatedUnion("category", [
   z.object({
@@ -136,6 +137,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const kind =
     parsed.data.category === "PAGE_CONTENT" ? ("PAGE_CONTENT" as const) : ("PRODUCT_PRICE" as const);
   const pageUrl = parsed.data.pageUrl;
+
+  // A monitor must watch a page on the website it belongs to.
+  if (!isUrlWithinDomain(pageUrl, website.domain)) {
+    return badRequest(`This monitor must be a page on ${website.domain}.`);
+  }
 
   const existing = await db
     .select({ id: schema.target.id })
