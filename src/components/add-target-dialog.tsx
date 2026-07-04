@@ -187,8 +187,28 @@ export function AddTargetDialog({
       setError(bodyJson.error ?? "Something went wrong");
       return;
     }
+    const createdJson = (await res.json().catch(() => ({}))) as {
+      targets?: { id?: string }[];
+    };
+    const newTargetId = createdJson.targets?.[0]?.id;
     handleClose();
     router.refresh();
+
+    // Kick off the first check automatically so the new monitor populates
+    // (baseline snapshot + screenshot) without the user tapping "Check now".
+    if (newTargetId) {
+      void fetch("/api/cron/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ websiteId, targetId: newTargetId }),
+      })
+        .then((r) => {
+          if (r.ok) router.refresh();
+        })
+        .catch(() => {
+          /* best-effort; the scheduled run will still pick it up */
+        });
+    }
   }
 
   const pageIncomplete = isPageScope && (offDomain || !pagePath.trim());
