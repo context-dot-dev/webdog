@@ -9,6 +9,8 @@ import { newId } from "@/lib/ids";
 import { monitorLimitError } from "@/lib/account-monitor-limits";
 import { isUrlWithinDomain } from "@/lib/domain";
 
+const watchNoteSchema = z.string().trim().max(300).optional();
+
 const createSchema = z.discriminatedUnion("category", [
   z.object({
     category: z.literal("LINK"),
@@ -16,6 +18,7 @@ const createSchema = z.discriminatedUnion("category", [
     externalNotify: z.boolean().optional(),
     checkIntervalHours: z.number().min(0.25).max(8760).optional(),
     aiChangeSummaryEnabled: z.boolean().optional(),
+    watchNote: watchNoteSchema,
   }),
   z.object({
     category: z.literal("PAGE_CONTENT"),
@@ -24,6 +27,7 @@ const createSchema = z.discriminatedUnion("category", [
     externalNotify: z.boolean().optional(),
     checkIntervalHours: z.number().min(0.25).max(8760).optional(),
     aiChangeSummaryEnabled: z.boolean().optional(),
+    watchNote: watchNoteSchema,
   }),
   z.object({
     category: z.literal("PRODUCT_PRICE"),
@@ -32,6 +36,7 @@ const createSchema = z.discriminatedUnion("category", [
     externalNotify: z.boolean().optional(),
     checkIntervalHours: z.number().min(0.25).max(8760).optional(),
     aiChangeSummaryEnabled: z.boolean().optional(),
+    watchNote: watchNoteSchema,
   }),
 ]);
 
@@ -95,6 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const checkIntervalHours = parsed.data.checkIntervalHours ?? 24;
   const aiChangeSummaryEnabled = parsed.data.aiChangeSummaryEnabled ?? false;
+  const watchNote = parsed.data.watchNote?.trim() || null;
 
   const created: (typeof schema.target.$inferSelect)[] = [];
 
@@ -121,6 +127,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       kind: "SITEMAP_LINKS",
       linkScope: "BOTH",
       pageUrl: null,
+      watchNote,
       notificationDestinationId: destId,
       externalNotify: wantOutbound,
       enabled: true,
@@ -158,6 +165,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     websiteId: id,
     kind,
     pageUrl,
+    watchNote,
     notificationDestinationId: destId,
     externalNotify: wantOutbound,
     enabled: true,

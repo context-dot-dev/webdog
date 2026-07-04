@@ -189,18 +189,41 @@ export function MonitorCard({
       <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <KindBadge kind={target.kind} />
-          <a
-            href={targetHref}
-            target="_blank"
-            rel="noreferrer noopener"
-            title={targetHref}
-            className="min-w-0 flex-1 truncate font-mono text-xs text-brand-800 hover:underline"
-          >
-            {targetLabel}
-          </a>
+          <div className="min-w-0 flex-1">
+            {target.watchNote ? (
+              <>
+                <p className="truncate text-sm font-medium text-neutral-900" title={target.watchNote}>
+                  {target.watchNote}
+                </p>
+                <a
+                  href={targetHref}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title={targetHref}
+                  className="block truncate font-mono text-xs text-neutral-500 hover:text-brand-700"
+                >
+                  {targetLabel}
+                </a>
+              </>
+            ) : (
+              <a
+                href={targetHref}
+                target="_blank"
+                rel="noreferrer noopener"
+                title={targetHref}
+                className="block truncate font-mono text-xs text-brand-800 hover:underline"
+              >
+                {targetLabel}
+              </a>
+            )}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <MonitorStatusPill hasRun={Boolean(target.lastCheckedAt)} latestChangeAt={latestChangeAt} />
+          <MonitorStatusPill
+            hasRun={Boolean(target.lastCheckedAt)}
+            latestChangeAt={latestChangeAt}
+            errored={Boolean(target.lastError)}
+          />
           <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-neutral-600">
             <span className="sr-only">Enabled</span>
             <span
@@ -226,6 +249,23 @@ export function MonitorCard({
         </div>
       </div>
 
+      {/* Last check failed */}
+      {target.lastError && (
+        <div className="flex items-start gap-2.5 border-t border-rose-500/15 bg-rose-50/60 px-4 py-3 sm:px-5">
+          <WarningIcon className="mt-0.5 size-4 shrink-0 text-rose-500" />
+          <div className="min-w-0 text-xs">
+            <p className="font-medium text-rose-800">Last check failed</p>
+            <p className="mt-0.5 text-rose-700">{target.lastError}</p>
+            {target.lastErrorAt && (
+              <p className="mt-0.5 text-rose-600/70">
+                <RelativeTime date={parseTimestamp(target.lastErrorAt)} />
+                {" · we'll keep retrying on schedule."}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Changes for this monitor */}
       {changes.length > 0 ? (
         <div className="border-t border-neutral-950/5">
@@ -245,14 +285,19 @@ export function MonitorCard({
           )}
         </div>
       ) : (
-        <div className="border-t border-neutral-950/5 px-4 py-3 text-xs text-neutral-500 sm:px-5">
-          {target.lastCheckedAt ? (
-            <>
-              No changes detected yet · last checked{" "}
-              <RelativeTime date={parseTimestamp(target.lastCheckedAt)} />
-            </>
-          ) : (
-            "Waiting for the first check to establish a baseline."
+        <div className="border-t border-neutral-950/5 px-4 py-3 sm:px-5">
+          <p className="text-xs text-neutral-500">
+            {target.lastCheckedAt ? (
+              <>
+                No changes yet · last checked{" "}
+                <RelativeTime date={parseTimestamp(target.lastCheckedAt)} />
+              </>
+            ) : (
+              "Waiting for the first check to establish a baseline."
+            )}
+          </p>
+          {currentContent && (
+            <SnapshotPreview content={currentContent} onExpand={() => setContentOpen(true)} />
           )}
         </div>
       )}
@@ -286,6 +331,13 @@ export function MonitorCard({
       {/* Current content */}
       {contentOpen && (
         <div className="space-y-4 border-t border-neutral-950/5 bg-neutral-50/50 px-4 py-4 sm:px-5">
+          {target.lastScreenshotUrl && (
+            <PageScreenshot
+              url={target.lastScreenshotUrl}
+              capturedAt={target.lastScreenshotAt}
+              pageHref={targetHref}
+            />
+          )}
           <TargetCurrentContent content={currentContent} />
           {target.kind === "PRODUCT_PRICE" && (
             <ProductPriceHistoryPanel points={productPriceHistory} pageUrl={target.pageUrl} />
@@ -389,5 +441,116 @@ export function MonitorCard({
         </div>
       )}
     </li>
+  );
+}
+
+function markdownSnippet(md: string, max = 260): string {
+  const cleaned = md.replace(/[#>*_`]+/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned.length > max ? `${cleaned.slice(0, max).trimEnd()}…` : cleaned;
+}
+
+/** Live screenshot of the watched page captured on the last check. */
+function PageScreenshot({
+  url,
+  capturedAt,
+  pageHref,
+}: {
+  url: string;
+  capturedAt: Target["lastScreenshotAt"];
+  pageHref: string;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="text-[0.6875rem] font-medium uppercase tracking-wide text-neutral-500">
+          Page screenshot
+        </span>
+        {capturedAt && (
+          <span className="text-[0.6875rem] text-neutral-400">
+            Captured <RelativeTime date={parseTimestamp(capturedAt)} />
+          </span>
+        )}
+      </div>
+      <a
+        href={pageHref}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="group block overflow-hidden rounded-xl ring-1 ring-neutral-950/10 transition hover:ring-brand-500/40"
+        title="Open the live page"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt="Screenshot of the monitored page"
+          loading="lazy"
+          className="max-h-80 w-full object-cover object-top transition group-hover:opacity-95"
+        />
+      </a>
+    </div>
+  );
+}
+
+/** Compact peek at what the monitor is currently watching, shown before any change lands. */
+function SnapshotPreview({
+  content,
+  onExpand,
+}: {
+  content: TargetCurrentContentData;
+  onExpand: () => void;
+}) {
+  if (content.kind === "markdown") {
+    const snippet = markdownSnippet(content.markdown);
+    if (!snippet) return null;
+    return (
+      <div className="mt-2 rounded-lg bg-neutral-50 p-2.5 ring-1 ring-neutral-950/5">
+        <p className="line-clamp-3 text-xs leading-relaxed text-neutral-600">{snippet}</p>
+        <button
+          type="button"
+          onClick={onExpand}
+          className="mt-1.5 text-xs font-medium text-brand-700 hover:underline"
+        >
+          View current content
+        </button>
+      </div>
+    );
+  }
+
+  if (content.kind === "sitemap") {
+    return (
+      <div className="mt-2 flex items-center gap-2 rounded-lg bg-neutral-50 p-2.5 text-xs text-neutral-600 ring-1 ring-neutral-950/5">
+        <span>
+          Tracking <span className="font-medium text-neutral-900">{content.urls.length}</span> URL
+          {content.urls.length === 1 ? "" : "s"} in the sitemap.
+        </span>
+        <button type="button" onClick={onExpand} className="ml-auto font-medium text-brand-700 hover:underline">
+          View
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-2 rounded-lg bg-neutral-50 p-2.5 text-xs text-neutral-600 ring-1 ring-neutral-950/5">
+      <span className="truncate">
+        {content.product.is_product_page
+          ? `Current: ${content.product.productName ?? "product"}`
+          : "Not detected as a product page yet."}
+      </span>
+      <button type="button" onClick={onExpand} className="ml-auto shrink-0 font-medium text-brand-700 hover:underline">
+        View
+      </button>
+    </div>
+  );
+}
+
+function WarningIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden {...props}>
+      <path
+        fillRule="evenodd"
+        d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+        clipRule="evenodd"
+      />
+    </svg>
   );
 }

@@ -95,6 +95,23 @@ export function PublicMonitorCard({
 
       {contentOpen && (
         <div className="space-y-4 border-t border-neutral-950/5 bg-neutral-50/50 px-4 py-4 sm:px-5">
+          {target.lastScreenshotUrl && (
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="group block overflow-hidden rounded-xl ring-1 ring-neutral-950/10 transition hover:ring-brand-500/40"
+              title="Open the live page"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={target.lastScreenshotUrl}
+                alt="Screenshot of the monitored page"
+                loading="lazy"
+                className="max-h-80 w-full object-cover object-top transition group-hover:opacity-95"
+              />
+            </a>
+          )}
           <TargetCurrentContent content={currentContent} />
           {target.kind === "PRODUCT_PRICE" && (
             <ProductPriceHistoryPanel points={productPriceHistory} pageUrl={target.pageUrl} />

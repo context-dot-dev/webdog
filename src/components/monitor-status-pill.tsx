@@ -1,13 +1,23 @@
 import { RelativeTime } from "./relative-time";
 
-/** Live status for a single monitor: waiting / changed / up to date. */
+/** Live status for a single monitor: error / waiting / changed / up to date. */
 export function MonitorStatusPill({
   hasRun,
   latestChangeAt,
+  errored,
 }: {
   hasRun: boolean;
   latestChangeAt: number | null;
+  errored?: boolean;
 }) {
+  if (errored) {
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-600/20 ring-inset">
+        <span className="size-1.5 rounded-full bg-rose-500" aria-hidden />
+        Check failed
+      </span>
+    );
+  }
   if (!hasRun) {
     return (
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600">

@@ -7,7 +7,14 @@ import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "./db/schema";
-import { extractProduct, scrapeMarkdown, scrapeSitemap, parseDomain } from "./context-client";
+import {
+  ContextDevError,
+  extractProduct,
+  scrapeMarkdown,
+  scrapeScreenshot,
+  scrapeSitemap,
+  parseDomain,
+} from "./context-client";
 import { newId } from "./ids";
 import type { AlertKind, NotificationChannel, Target } from "./db/schema";
 import { dispatchNewAlertsForDestinations } from "./dispatch-new-alerts";
@@ -24,6 +31,19 @@ import {
 
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
+}
+
+/** A short, user-facing reason a check failed (stored on target.lastError). */
+function describeCheckError(err: unknown): string {
+  if (err instanceof ContextDevError) {
+    if (err.status === 404) return "Page not found (404). Check the URL is correct and publicly reachable.";
+    if (err.status === 403 || err.status === 401) return "The page blocked our request (auth/permission).";
+    if (err.status === 429) return "Rate limited by context.dev — will retry on the next check.";
+    if (err.status >= 500) return "The page or scraper is temporarily unavailable. We'll retry.";
+    return err.message || `Check failed (${err.status}).`;
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return "The check failed for an unknown reason.";
 }
 
 type SnapshotKind = "SITEMAP" | "MARKDOWN" | "PRODUCT";
@@ -64,8 +84,29 @@ interface SiteScrapeCache {
   sitemap?: { urls: string[]; hash: string };
   markdown: Map<string, { md: string; hash: string }>;
   product: Map<string, { payload: string; hash: string }>;
+  /** Latest page screenshot URL per page URL (context.dev CDN). */
+  screenshot: Map<string, string>;
   /** Per-user context.dev key; null = use env only. */
   contextApiKey: string | null;
+}
+
+/**
+ * Best-effort screenshot of the watched page for the "current version" view.
+ * Never throws — a screenshot failure must not fail the content/price check.
+ */
+async function ensurePageScreenshot(pageUrl: string, cache: SiteScrapeCache): Promise<string | null> {
+  const cached = cache.screenshot.get(pageUrl);
+  if (cached) return cached;
+  try {
+    const shot = await scrapeScreenshot({ directUrl: pageUrl, apiKey: cache.contextApiKey });
+    const url = shot.screenshot?.trim() || null;
+    if (url) cache.screenshot.set(pageUrl, url);
+    return url;
+  } catch (err) {
+    const message = err instanceof ContextDevError ? err.message : String(err);
+    console.warn(`screenshot failed for ${pageUrl}:`, message);
+    return null;
+  }
 }
 
 async function ensureSitemap(website: { id: string; url: string; domain: string }, cache: SiteScrapeCache) {
@@ -154,31 +195,28 @@ async function handleContentTarget(
 ): Promise<void> {
   if (!target.pageUrl) return;
   const page = target.pageUrl;
-  try {
-    const curr = await ensureMarkdown(page, cache);
-    const prev = await latestSnapshot(website.id, "MARKDOWN", page);
-    if (prev && prev.hash !== curr.hash) {
-      const { preview, totalAdded, totalRemoved } = diffPreview(prev.payload, curr.md);
-      alerts.push({
-        id: newId("alt"),
-        websiteId: website.id,
-        targetId: target.id,
-        kind: "PAGE_CONTENT",
-        title: `Content changed on ${page}`,
-        details: JSON.stringify({ pageUrl: page, diffPreview: preview, totalAdded, totalRemoved }),
-        createdAt: new Date(),
-        summaryDetails: {
-          pageUrl: page,
-          beforeMarkdown: prev.payload,
-          afterMarkdown: curr.md,
-          diffPreview: preview,
-          totalAdded,
-          totalRemoved,
-        },
-      });
-    }
-  } catch (err) {
-    console.error(`scrape markdown failed for ${page}:`, err);
+  const curr = await ensureMarkdown(page, cache);
+  await ensurePageScreenshot(page, cache);
+  const prev = await latestSnapshot(website.id, "MARKDOWN", page);
+  if (prev && prev.hash !== curr.hash) {
+    const { preview, totalAdded, totalRemoved } = diffPreview(prev.payload, curr.md);
+    alerts.push({
+      id: newId("alt"),
+      websiteId: website.id,
+      targetId: target.id,
+      kind: "PAGE_CONTENT",
+      title: `Content changed on ${page}`,
+      details: JSON.stringify({ pageUrl: page, diffPreview: preview, totalAdded, totalRemoved }),
+      createdAt: new Date(),
+      summaryDetails: {
+        pageUrl: page,
+        beforeMarkdown: prev.payload,
+        afterMarkdown: curr.md,
+        diffPreview: preview,
+        totalAdded,
+        totalRemoved,
+      },
+    });
   }
 }
 
@@ -190,48 +228,45 @@ async function handleProductPriceTarget(
 ): Promise<void> {
   if (!target.pageUrl) return;
   const page = target.pageUrl;
-  try {
-    const result = await extractProduct(page, { apiKey: cache.contextApiKey });
-    const snap: ProductSnapshotData = {
-      is_product_page: result.is_product_page,
-      platform: result.platform ?? null,
-      productName: result.product?.name ?? null,
-      price: result.product?.price ?? null,
-      currency: result.product?.currency ?? null,
-    };
-    const payload = JSON.stringify(snap);
-    const value = { payload, hash: sha256(payload) };
-    cache.product.set(page, value);
+  const result = await extractProduct(page, { apiKey: cache.contextApiKey });
+  await ensurePageScreenshot(page, cache);
+  const snap: ProductSnapshotData = {
+    is_product_page: result.is_product_page,
+    platform: result.platform ?? null,
+    productName: result.product?.name ?? null,
+    price: result.product?.price ?? null,
+    currency: result.product?.currency ?? null,
+  };
+  const payload = JSON.stringify(snap);
+  const value = { payload, hash: sha256(payload) };
+  cache.product.set(page, value);
 
-    const prev = await latestSnapshot(website.id, "PRODUCT", page);
-    if (!prev) return;
-    if (!snap.is_product_page) return;
-    const prevData = JSON.parse(prev.payload) as ProductSnapshotData;
-    if (!prevData.is_product_page) return;
-    if (priceChangeKey(prevData) === priceChangeKey(snap)) return;
+  const prev = await latestSnapshot(website.id, "PRODUCT", page);
+  if (!prev) return;
+  if (!snap.is_product_page) return;
+  const prevData = JSON.parse(prev.payload) as ProductSnapshotData;
+  if (!prevData.is_product_page) return;
+  if (priceChangeKey(prevData) === priceChangeKey(snap)) return;
 
-    const name = snap.productName || page;
-    const fmt = (p: number | null, c: string | null) =>
-      p === null || p === undefined ? "—" : `${c ? `${c} ` : ""}${p}`.trim();
-    alerts.push({
-      id: newId("alt"),
-      websiteId: website.id,
-      targetId: target.id,
-      kind: "PRODUCT_PRICE",
-      title: `Price change: ${name} (${fmt(prevData.price, prevData.currency)} → ${fmt(snap.price, snap.currency)})`,
-      details: JSON.stringify({
-        pageUrl: page,
-        productName: snap.productName,
-        previousPrice: prevData.price,
-        previousCurrency: prevData.currency,
-        newPrice: snap.price,
-        newCurrency: snap.currency,
-      }),
-      createdAt: new Date(),
-    });
-  } catch (err) {
-    console.error(`extract product failed for ${page}:`, err);
-  }
+  const name = snap.productName || page;
+  const fmt = (p: number | null, c: string | null) =>
+    p === null || p === undefined ? "—" : `${c ? `${c} ` : ""}${p}`.trim();
+  alerts.push({
+    id: newId("alt"),
+    websiteId: website.id,
+    targetId: target.id,
+    kind: "PRODUCT_PRICE",
+    title: `Price change: ${name} (${fmt(prevData.price, prevData.currency)} → ${fmt(snap.price, snap.currency)})`,
+    details: JSON.stringify({
+      pageUrl: page,
+      productName: snap.productName,
+      previousPrice: prevData.price,
+      previousCurrency: prevData.currency,
+      newPrice: snap.price,
+      newCurrency: snap.currency,
+    }),
+    createdAt: new Date(),
+  });
 }
 
 export type RunWebsiteChecksOptions = {
@@ -322,7 +357,12 @@ export async function runWebsiteChecks(
         .from(schema.target)
         .where(and(eq(schema.target.websiteId, websiteId), eq(schema.target.enabled, true)));
 
-  const cache: SiteScrapeCache = { markdown: new Map(), product: new Map(), contextApiKey };
+  const cache: SiteScrapeCache = {
+    markdown: new Map(),
+    product: new Map(),
+    screenshot: new Map(),
+    contextApiKey,
+  };
   const alerts: AlertInsert[] = [];
   let errors = 0;
 
@@ -361,14 +401,40 @@ export async function runWebsiteChecks(
           nowMs,
         );
 
+        const screenshotUrl = t.pageUrl ? cache.screenshot.get(t.pageUrl) : undefined;
+
         await tx
           .update(schema.target)
-          .set({ lastCheckedAt: new Date(nowMs), nextCheckDueAt })
+          .set({
+            lastCheckedAt: new Date(nowMs),
+            nextCheckDueAt,
+            lastError: null,
+            lastErrorAt: null,
+            ...(screenshotUrl
+              ? { lastScreenshotUrl: screenshotUrl, lastScreenshotAt: new Date(nowMs) }
+              : {}),
+          })
           .where(eq(schema.target.id, t.id));
       });
     } catch (err) {
       errors += 1;
       console.error(`target ${t.id} (${t.kind}) failed:`, err);
+      // Surface the failure on the monitor and back off to the normal cadence so a
+      // broken URL doesn't get retried every worker tick.
+      const nowMs = Date.now();
+      try {
+        await db
+          .update(schema.target)
+          .set({
+            lastCheckedAt: new Date(nowMs),
+            lastError: describeCheckError(err),
+            lastErrorAt: new Date(nowMs),
+            nextCheckDueAt: computeNextCheckDueAfterSuccess(t.nextCheckDueAt, t.checkIntervalHours, nowMs),
+          })
+          .where(eq(schema.target.id, t.id));
+      } catch (updateErr) {
+        console.error(`failed to record error state for target ${t.id}:`, updateErr);
+      }
     }
   }
 
@@ -428,6 +494,7 @@ export async function runWebsiteChecks(
           title: a.title,
           detailsJson: a.details,
           detailsForSummary: a.summaryDetails,
+          watchNote: tgt.watchNote,
         });
         if (summary) {
           a.details = mergeAlertDetails(a.details, { aiChangeSummary: summary });

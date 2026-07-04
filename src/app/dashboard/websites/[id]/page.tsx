@@ -176,6 +176,8 @@ export default async function WebsiteDetailPage({
             websiteId={website.id}
             websiteDomain={website.domain}
             destinations={notificationDestChoices}
+            resendApiKeyManaged={resendApiKeyManaged}
+            resendSendFromEmailManaged={resendSendFromEmailManaged}
           />
         </div>
 
