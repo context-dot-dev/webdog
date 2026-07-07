@@ -1,204 +1,99 @@
-# webdog.ai
+<p align="center">
+  <img src="./logo.png" width="120">
+</p>
 
-Open-source website change monitoring: scrape pages, diff over time, and get notified when something moves, disappears, or edits.
+<h1 align="center">webdog.ai</h1>
 
-## Requirements
+<p align="center">
+Watch any website. Know the moment it changes.
+</p>
 
-- **Node.js** 20.9+ (matches the Next.js runtime requirement)
-- **npm** (or your preferred package manager)
-- **Docker** with Docker Compose for the easiest local PostgreSQL setup
-- **PostgreSQL** 14+ if you prefer running your own local or managed database
+<p align="center">
 
-## Setup
+⭐ Star us • 🏠 Self-hostable • 📜 MIT
 
-1. **Clone and install dependencies**
+</p>
 
-   ```bash
-   git clone https://github.com/context-dot-dev/website-watchdog.git
-   cd website-watchdog
-   npm install
-   ```
+<p align="center">
+<img src="./hero.png">
+</p>
 
-2. **Environment variables**
+---
 
-   Copy the example file and edit it:
+## Built with Context.dev 🥠
 
-   ```bash
-   cp .env.example .env
-   ```
+webdog.ai is a fully open-source website monitoring platform built almost entirely on the **Context.dev API**.
 
-   For local development, the checked-in Docker Compose file matches the default **`DATABASE_URL`** in `.env.example`. Set **`BETTER_AUTH_SECRET`** to a long random string if you want realistic auth cookies:
+Paste any URL and we'll:
 
-   ```bash
-   openssl rand -base64 32
-   ```
+- 📄 Scrape the page
+- 🤖 Understand what changed
+- 📸 Capture screenshots
+- 🔍 Generate visual diffs
+- 🔔 Notify you instantly
 
-   Optional service keys such as **`CONTEXT_DEV_API_KEY`**, **`RESEND_API_KEY`**, and **`RESEND_SEND_FROM_EMAIL`** are documented in `.env.example`.
+---
 
-3. **Start PostgreSQL and create the schema**
+## Why?
 
-   Start the local Postgres container:
+Perfect for monitoring:
 
-   ```bash
-   npm run db:up
-   ```
+- 🤖 AI announcements
+- 💰 Pricing pages
+- 💼 Job listings
+- 📰 Blogs
+- 🛍️ Ecommerce
+- 📚 Documentation
+- 🏛️ Government websites
 
-   If port `5432` is already in use, set both values in `.env` before starting Postgres:
+---
 
-   ```bash
-   POSTGRES_PORT=5433
-   DATABASE_URL=postgres://postgres:postgres@localhost:5433/webdog_ai
-   ```
-
-   Apply the Drizzle schema and verify connectivity:
-
-   ```bash
-   npm run db:push
-   npm run db:check
-   ```
-
-   Without the schema step, the API will error with `relation "user" does not exist` (or similar) and sign-in / sign-up will not work.
-
-4. **Run the app**
-
-   ```bash
-   npm run dev
-   ```
-
-   Open [http://localhost:3000](http://localhost:3000) and create an account. If you use `http://127.0.0.1:3000` instead of `localhost`, ensure `BETTER_AUTH_URL` matches how you open the app, or add extra origins via `BETTER_AUTH_TRUSTED_ORIGINS` in `.env` (see [Better Auth](https://www.better-auth.com/docs) and `.env.example`).
-
-5. **Run the worker**
-
-   Scrapes are performed by a separate worker process. Run it in another terminal during local development:
-
-   ```bash
-   npm run worker
-   ```
-
-   To verify the worker path once without leaving it running:
-
-   ```bash
-   npm run worker:once
-   ```
-
-## Verification
-
-Before opening a pull request, run:
+## Quick Start
 
 ```bash
-npm run db:check
-npm run typecheck
-npm run lint
-npm run build
-npm audit --omit=dev
+git clone https://github.com/context-dot-dev/website-watchdog
+
+npm install
+
+cp .env.example .env
+
+npm run db:up
+npm run db:push
+
+npm run dev
+npm run worker
 ```
 
-## Other scripts
+Done.
 
-| Command            | Description                                      |
-| ------------------ | ------------------------------------------------ |
-| `npm run build`    | Production build                                 |
-| `npm run start`    | Start production server (after `build`)         |
-| `npm run typecheck` | Run TypeScript without emitting files           |
-| `npm run lint`     | Run ESLint against source, scripts, and config files |
-| `npm run worker`   | Long-running worker that runs scrapes on a schedule |
-| `npm run worker:once` | Run the worker once and exit                 |
-| `npm run db:up` | Start local PostgreSQL with Docker Compose |
-| `npm run db:down` | Stop the local Docker Compose services |
-| `npm run db:check` | Verify PostgreSQL connectivity and expected tables |
-| `npm run db:push` | Push the current schema to the configured PostgreSQL database |
-| `npm run db:reset` | Drop/recreate the configured PostgreSQL `public` schema, then push the current schema |
-| `npm run db:generate` | Generate SQL migration files from the schema  |
-| `npm run db:migrate`  | Run migrations (when you use generated files)  |
+---
 
-## Production notes
+## Powered by
 
-- **`DATABASE_URL`** is required and must point at PostgreSQL (`postgres://` or `postgresql://`). Run migrations before serving traffic.
-- On **Railway**, omit **`BETTER_AUTH_URL`** to use **`https://${RAILWAY_PUBLIC_DOMAIN}`** when public networking is enabled; override with **`BETTER_AUTH_URL`** or **`NEXT_PUBLIC_APP_URL`** if needed (see **Deploy on Railway**). Elsewhere set **`BETTER_AUTH_URL`** to your public `https://…` URL. Keep **`BETTER_AUTH_SECRET`** private.
-- Server-managed **`CONTEXT_DEV_API_KEY`**, **`RESEND_API_KEY`**, and **`RESEND_SEND_FROM_EMAIL`** are used only on the server. When provided, the dashboard hides those account-level setup fields and does not return the values to the browser.
-- **`MAX_ALERTS`** can cap active monitors per account, and **`POSTFIX_TO_ALERTS`** can append deployment-specific text to new alerts.
-- Use `npm run build` then `npm run start` for the Next.js app, and run the **worker** separately (e.g. as another process or service) if you need scheduled checks.
+- ▲ Next.js
+- ⚡ Context.dev
+- 🐘 PostgreSQL
+- 🔑 Better Auth
+- 🐳 Docker
 
-### Better Auth `disableOriginCheck` (avoid if you can)
+---
 
-Better Auth’s **`advanced.disableOriginCheck`** (here: opt in with **`BETTER_AUTH_DISABLE_ORIGIN_CHECK=true`**) does **not** only skip “compare `callbackURL` to `trustedOrigins`.” In this library’s middleware it also **short-circuits `Origin` / `Referer` validation** for many state-changing requests, which is part of the **CSRF** story for cookie-backed sessions.
+## Built using Context.dev
 
-**Risks if you enable it on an instance reachable from the web:**
+Want to build your own AI-powered scraper?
 
-- **Open redirects** — If any auth flow accepts `callbackURL`, `redirectTo`, or similar from the client (or from a URL the client can influence), an attacker can send victims through your domain and **land on a malicious site** after sign-in, or abuse redirects for phishing.
-- **CSRF-class abuse** — With origin checks relaxed, **other websites** can more easily cause a victim’s browser to send **authenticated requests** to your app (session riding), depending on endpoint behavior and what the browser sends.
+```ts
+const html = await context.scrape("https://openai.com");
+```
 
-Prefer fixing **`BETTER_AUTH_URL`**, **`BETTER_AUTH_ALLOWED_HOSTS`**, or **`BETTER_AUTH_TRUSTED_ORIGINS`** instead. A second env **`BETTER_AUTH_DISABLE_CSRF_CHECK=true`** turns off even more protections; do not use on public deployments.
+Everything in this repository—from screenshots to AI summaries—is powered by Context.dev.
 
+👉 **Get your API key →**
 
-## Deploy on Railway (self-hosted, PostgreSQL)
-
-The repo includes [`railway.json`](railway.json) so one **Railway service** runs both the Next.js app and the scrape **worker** in the same container. Add a Railway PostgreSQL service and expose its connection string to the app as **`DATABASE_URL`**.
-
-### Public URL / Better Auth (Railway defaults vs configuration)
-
-Railway injects system variables such as **`RAILWAY_PUBLIC_DOMAIN`** (the **public** hostname, e.g. `your-service.up.railway.app` or your custom domain) and **`RAILWAY_PRIVATE_DOMAIN`** (internal DNS like `*.railway.internal` — **not** a browser URL; do not use it for auth). See [Railway variables](https://docs.railway.com/reference/variables).
-
-This app **defaults to Railway’s public domain first**, then falls back when needed:
-
-1. **`BETTER_AUTH_URL`** — if you set it explicitly, it **wins** (use a full `https://…` URL). Omit it to use Railway’s domain automatically.
-2. **`https://${RAILWAY_PUBLIC_DOMAIN}`** — used when **`BETTER_AUTH_URL`** is unset and Railway has populated **`RAILWAY_PUBLIC_DOMAIN`** (requires **public networking** and a generated or custom domain).
-3. **`NEXT_PUBLIC_APP_URL`** — used on Railway only when step 2 is unavailable (e.g. empty domain after first deploy) or you want the client bundle and server to agree on a single explicit public URL. Set it to the same `https://…` origin users open.
-
-You still **configure** the deployment so one of these resolves to a real HTTPS origin: turn on public networking, or set **`BETTER_AUTH_URL`** / **`NEXT_PUBLIC_APP_URL`**. The app does not guess a public URL without Railway’s public domain or your variables.
-
-### One-click template (operators)
-
-**You only need to provide a [context.dev](https://context.dev) API key.** Everything else has Railway-aware defaults:
-
-- **`CONTEXT_DEV_API_KEY`** — required for scrapes (same as local dev).
-- **`RESEND_API_KEY`** and **`RESEND_SEND_FROM_EMAIL`** — optional server-managed email delivery for all accounts.
-- **`MAX_ALERTS`** — optional maximum active monitors per account.
-- **`POSTFIX_TO_ALERTS`** — optional text appended to new alert titles and outbound email subjects.
-- **`DATABASE_URL`** — required PostgreSQL connection string; Railway PostgreSQL can inject this automatically.
-- **`BETTER_AUTH_URL`** — optional; if unset, the app uses **`https://${RAILWAY_PUBLIC_DOMAIN}`** when Railway provides it (see **Public URL / Better Auth** above). Set explicitly for an override or when the system domain variable is unreliable.
-- **`NEXT_PUBLIC_APP_URL`** — optional Railway fallback (`https://…`) after **`RAILWAY_PUBLIC_DOMAIN`**; useful when the system variable is empty or must match Next’s public bundle.
-- **`BETTER_AUTH_ALLOWED_HOSTS`** — optional; comma-separated **host patterns** (wildcards allowed, e.g. `*.up.railway.app`) so sign-in works from **multiple or changing** public URLs without redeploying each time.
-- **`BETTER_AUTH_SECRET`** — required for production unless supplied by a template variable such as `${{secret(...)}}`.
-- **`SCRAPE_CRON`**, **`BETTER_AUTH_TRUSTED_ORIGINS`** — optional.
-
-Steps:
-
-1. Create a Railway project from this repo (or deploy a template based on it).
-2. Add a **PostgreSQL** service and connect it to the app so **`DATABASE_URL`** is available.
-3. Turn on **public networking** and generate a Railway domain (or configure a custom domain).
-4. Set **`CONTEXT_DEV_API_KEY`**, **`BETTER_AUTH_SECRET`** (and any optional managed settings above), then deploy.
-
-Start runs `npm run db:migrate`, then the worker in the background and `next start` in the foreground. Health checks use `GET /api/health`.
-
-**“Invalid origin” on sign-up / sign-in** usually means **`BETTER_AUTH_URL` / Railway’s public domain / `NEXT_PUBLIC_APP_URL`** are out of sync with the address bar. Prefer fixing public networking so **`RAILWAY_PUBLIC_DOMAIN`** is set; then **`NEXT_PUBLIC_APP_URL`** or **`BETTER_AUTH_URL`** if it stays blank. Or use **`BETTER_AUTH_ALLOWED_HOSTS`** for several hostnames (comma-separated patterns, no scheme), e.g. **`*.up.railway.app,myapp.com,www.myapp.com`**. For one-off extra origins, **`BETTER_AUTH_TRUSTED_ORIGINS`**. Do **not** leave **`BETTER_AUTH_URL=http://localhost:3000`** on a public Railway site.
-
-### Manual / non-template deploy
-
-| Variable | Example / notes |
-|----------|-----------------|
-| `DATABASE_URL` | Required PostgreSQL URL, e.g. Railway PostgreSQL’s injected connection string |
-| `BETTER_AUTH_SECRET` | Required secret for cookie/session signing |
-| *(Railway system)* | **`RAILWAY_PUBLIC_DOMAIN`** — used automatically as `https://…` when **`BETTER_AUTH_URL`** is unset |
-| `NEXT_PUBLIC_APP_URL` | Optional; `https://…` fallback on Railway when the system public domain is missing / you want an explicit public URL in the client |
-| `BETTER_AUTH_URL` | Optional override; also the **fallback** when using **`BETTER_AUTH_ALLOWED_HOSTS`** |
-| `BETTER_AUTH_ALLOWED_HOSTS` | Optional; e.g. `*.up.railway.app,my.com` — per-request host allowlist (see README above) |
-| `CONTEXT_DEV_API_KEY` | Bearer token for context.dev |
-| `RESEND_API_KEY` | Optional server-managed Resend API key for email notifications |
-| `RESEND_SEND_FROM_EMAIL` | Optional server-managed sender address for email notifications |
-| `POSTFIX_TO_ALERTS` | Optional text appended to new alert titles and outbound email subjects |
-| `MAX_ALERTS` | Optional active monitor limit per account |
-
-### Publishing your own Railway template
-
-Follow **[`railway/template-publish.md`](railway/template-publish.md)** for icons, naming, PostgreSQL setup, health path **`/api/health`**, variable descriptions, and marketplace overview text aligned with Railway’s [template best practices](https://docs.railway.com/templates/best-practices).
-
-In the [template composer](https://docs.railway.com/templates/create): add this repo as the service source, add a PostgreSQL service, wire its connection string to **`DATABASE_URL`**, enable HTTP public networking, and add a **required** variable **`CONTEXT_DEV_API_KEY`** for deployers. Add **`BETTER_AUTH_SECRET=${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=`** (see [template variable functions](https://docs.railway.com/templates/create#template-variable-functions)). Optional: expose **`RESEND_API_KEY`**, **`RESEND_SEND_FROM_EMAIL`**, **`MAX_ALERTS`**, and **`POSTFIX_TO_ALERTS`** for managed deployments. Copy the **template URL** Railway gives you into your README or site for one-click deploys.
-
-## Team invites (shared accounts)
-
-There is **no outbound email product** here. Invite teammates from **Settings → Team**: that shows a shareable URL you paste into chat; the same link allows up to **five** people to join before it stops accepting new members (`INVITE_MAX_USES` in [`src/lib/invite-constants.ts`](src/lib/invite-constants.ts)), and it still expires after a TTL in that same file. A short **organization label** on the invite powers the invite sign-in/up copy (from your newest site title/name or your profile name—not a live Context.dev call). There is no automated password-reset email — ask someone who can open **Settings → Team** to send a fresh invite after a collaborator signs up again.
+---
 
 ## Contributing
 
-Contributions are welcome. Please open an issue or pull request with a short description of the change.
+PRs welcome ❤️
+
+If you build something cool using Context.dev, we'd love to feature it.
