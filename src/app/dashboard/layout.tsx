@@ -97,6 +97,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </header>
 
       <main className="relative min-w-0">{children}</main>
+
+      <a
+        href="https://context.dev"
+        target="_blank"
+        rel="noreferrer noopener"
+        aria-label="Built using Context.dev"
+        className="fixed bottom-3 right-3 z-30 opacity-90 transition-opacity hover:opacity-100 sm:bottom-4 sm:right-4"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/fortunecookie.png"
+          alt="Built using Context.dev"
+          className="w-40 drop-shadow-md sm:w-52"
+        />
+      </a>
     </div>
   );
 }

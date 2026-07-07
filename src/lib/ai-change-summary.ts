@@ -160,14 +160,23 @@ export async function summarizeChange(params: {
   alertKind: AlertKind;
   title: string;
   changeText: string;
+  /** User's free-text intent for this monitor; steers the summary toward what they care about. */
+  watchNote?: string | null;
 }): Promise<string | null> {
-  const { config, website, alertKind, title, changeText } = params;
+  const { config, website, alertKind, title, changeText, watchNote } = params;
   const siteContext = buildWebsiteContext(website);
+  const note = watchNote?.trim();
   const userMessage = [
     `Website context:\n${siteContext}`,
     "",
     `Change type: ${alertKind}`,
     `Alert title: ${title}`,
+    ...(note
+      ? [
+          "",
+          `The user set up this monitor to watch for: "${note}". Lead with whether this change relates to that, then note anything else important.`,
+        ]
+      : []),
     "",
     "Change data:",
     truncateChangeText(changeText),
@@ -210,6 +219,7 @@ export async function trySummarizeAlert(params: {
   title: string;
   detailsJson: string;
   detailsForSummary?: AlertDetailsForSummary;
+  watchNote?: string | null;
 }): Promise<string | null> {
   let details: AlertDetailsForSummary = params.detailsForSummary ?? {};
   if (!params.detailsForSummary) {
@@ -226,5 +236,6 @@ export async function trySummarizeAlert(params: {
     alertKind: params.alertKind,
     title: params.title,
     changeText,
+    watchNote: params.watchNote,
   });
 }

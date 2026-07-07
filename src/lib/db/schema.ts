@@ -144,6 +144,8 @@ export const website = pgTable(
      * Use `[]` to disable notifications for this site.
      */
     notificationDestinationIds: text("notificationDestinationIds"),
+    /** Unguessable token for a read-only public view; null = not shared. */
+    publicShareToken: text("publicShareToken").unique(),
     createdAt: timestamp("createdAt", { withTimezone: true, precision: 3 })
       .notNull()
       .defaultNow(),
@@ -171,12 +173,22 @@ export const target = pgTable(
     linkScope: text("linkScope", { enum: ["NEW", "REMOVED", "BOTH"] }),
     /** For PAGE_CONTENT / PRODUCT_PRICE: the page URL. Null for sitemap-based targets. */
     pageUrl: text("pageUrl"),
+    /** Optional free-text note of what the user wants to watch for; labels the monitor and focuses AI summaries. */
+    watchNote: text("watchNote"),
     enabled: boolean("enabled").notNull().default(true),
     /** Minimum spacing between successful checks (hours, fractional OK — e.g. 0.25 = 15m); worker wakes per SCRAPE_CRON. */
     checkIntervalHours: doublePrecision("checkIntervalHours").notNull().default(1),
     /** Sole eligibility clock for scheduled runs; advanced by fixed interval after success. Null = due immediately. */
     nextCheckDueAt: timestamp("nextCheckDueAt", { withTimezone: true, precision: 3 }),
     lastCheckedAt: timestamp("lastCheckedAt", { withTimezone: true, precision: 3 }),
+    /** Human-readable message from the most recent failed check; null once a check succeeds. */
+    lastError: text("lastError"),
+    /** When the last failed check happened; null once a check succeeds. */
+    lastErrorAt: timestamp("lastErrorAt", { withTimezone: true, precision: 3 }),
+    /** context.dev CDN screenshot URL of the watched page from the most recent check. */
+    lastScreenshotUrl: text("lastScreenshotUrl"),
+    /** When the stored screenshot was captured. */
+    lastScreenshotAt: timestamp("lastScreenshotAt", { withTimezone: true, precision: 3 }),
     /**
      * When false, alerts are stored only in-app — no Slack/email/webhook for this target.
      * When true, `notificationDestinationId` selects the target's external destination.

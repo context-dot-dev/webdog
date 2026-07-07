@@ -4,6 +4,9 @@ import * as schema from "@/lib/db/schema";
 import { websiteOwnerAccessible } from "@/lib/account-access";
 import { requireUser } from "@/lib/session";
 import { WebsiteListView } from "@/components/website-list-view";
+import { effectiveContextDevApiKey } from "@/lib/server-managed-config";
+import { getStarterTemplatesWithLogos } from "@/lib/starter-template-logos.server";
+import { STARTER_TEMPLATES } from "@/lib/starter-templates";
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -52,9 +55,21 @@ export default async function DashboardPage() {
     .where(websiteOwnerAccessible(user.id))
     .orderBy(desc(schema.website.createdAt));
 
+  // Only pay for brand lookups on the empty state, where templates are shown.
+  let templates = STARTER_TEMPLATES.map((t) => ({ ...t, logoUrl: null as string | null }));
+  if (websites.length === 0) {
+    const [settings] = await db
+      .select({ contextDevApiKey: schema.userNotificationSettings.contextDevApiKey })
+      .from(schema.userNotificationSettings)
+      .where(eq(schema.userNotificationSettings.userId, user.id))
+      .limit(1);
+    const apiKey = effectiveContextDevApiKey(settings?.contextDevApiKey);
+    templates = await getStarterTemplatesWithLogos(apiKey);
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-12">
-      <WebsiteListView websites={websites} />
+      <WebsiteListView websites={websites} templates={templates} />
     </div>
   );
 }

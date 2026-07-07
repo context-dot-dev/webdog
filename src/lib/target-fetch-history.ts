@@ -42,6 +42,12 @@ function buildChangeDetail(kind: "SITEMAP" | "MARKDOWN" | "PRODUCT", prev: Snaps
   return { kind: "product", before: b, after: a };
 }
 
+/** The most recently captured content for a target, for the "current version" view. */
+export type TargetCurrentContent =
+  | { kind: "markdown"; capturedAt: number; markdown: string }
+  | { kind: "sitemap"; capturedAt: number; urls: string[] }
+  | { kind: "product"; capturedAt: number; product: ProductSnapshotData };
+
 function snapshotsForTarget(target: Target, snapshots: Snapshot[]): Snapshot[] {
   if (target.kind === "SITEMAP_LINKS") {
     return snapshots.filter((s) => s.kind === "SITEMAP" && s.targetUrl == null);
@@ -62,6 +68,37 @@ function snapshotsForTarget(target: Target, snapshots: Snapshot[]): Snapshot[] {
  * (this fetch vs the one immediately before it); shown for every row except the
  * oldest in the current window, which is the baseline.
  */
+/**
+ * The latest stored snapshot for a target, decoded into a shape the UI can render
+ * directly ("current version"). Returns null when nothing has been captured yet.
+ */
+export function latestContentForTarget(
+  target: Target,
+  snapshots: Snapshot[],
+): TargetCurrentContent | null {
+  const filtered = snapshotsForTarget(target, snapshots);
+  if (filtered.length === 0) return null;
+  const latest = filtered.reduce((a, b) => (Number(b.createdAt) > Number(a.createdAt) ? b : a));
+  const capturedAt = Number(latest.createdAt);
+
+  if (latest.kind === "MARKDOWN") {
+    return { kind: "markdown", capturedAt, markdown: latest.payload };
+  }
+  if (latest.kind === "SITEMAP") {
+    let urls: string[] = [];
+    try {
+      urls = JSON.parse(latest.payload) as string[];
+    } catch {
+      urls = [];
+    }
+    return { kind: "sitemap", capturedAt, urls };
+  }
+  const product =
+    parseProductSnapshotPayload(latest.payload) ??
+    (JSON.parse(latest.payload) as ProductSnapshotData);
+  return { kind: "product", capturedAt, product };
+}
+
 export function buildFetchHistoryForTarget(target: Target, snapshots: Snapshot[]): TargetFetchEntry[] {
   const filtered = snapshotsForTarget(target, snapshots);
   if (filtered.length === 0) return [];

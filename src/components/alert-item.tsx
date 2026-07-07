@@ -38,6 +38,7 @@ export function AlertItem({
   website,
   titleLabel,
   attribution,
+  readOnly,
 }: {
   alert: Alert;
   highlighted?: boolean;
@@ -49,6 +50,8 @@ export function AlertItem({
   titleLabel?: string;
   /** Optional deployment attribution shown in the expanded footer. */
   attribution?: string | null;
+  /** Public/view-only: expand to read the diff, but never mark read or hit the API. */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(highlighted ?? false);
@@ -74,9 +77,10 @@ export function AlertItem({
   }, [highlighted, scrollToDiff, expanded, alert.id]);
 
   const details = safeParse(alert.details);
+  const mag = changeMagnitude(details);
 
   async function markRead() {
-    if (read) return;
+    if (read || readOnly) return;
     setBusy(true);
     const res = await fetch(`/api/alerts/${alert.id}`, {
       method: "PATCH",
@@ -90,10 +94,11 @@ export function AlertItem({
     }
   }
 
+  const showUnread = !read && !readOnly;
   const shellCls = [
     "transition-colors",
     highlighted ? "ring-1 ring-inset ring-neutral-950/10" : "",
-    read ? "bg-white" : "bg-white shadow-[inset_3px_0_0_0_theme(colors.brand.500)]",
+    showUnread ? "bg-white shadow-[inset_3px_0_0_0_theme(colors.brand.500)]" : "bg-white",
     "hover:bg-neutral-950/[0.02]",
   ].join(" ");
 
@@ -112,7 +117,7 @@ export function AlertItem({
         }}
       >
         <span className="shrink-0" aria-hidden>
-          <span className={`block rounded-full ${read ? "size-1.5 bg-neutral-300" : "size-2 bg-brand-500"}`} />
+          <span className={`block rounded-full ${showUnread ? "size-2 bg-brand-500" : "size-1.5 bg-neutral-300"}`} />
         </span>
         {website && (
           <Link
@@ -140,6 +145,16 @@ export function AlertItem({
         <p className="min-w-0 flex-1 truncate text-sm text-neutral-900">
           {titleLabel ?? alert.title.replace(/https?:\/\//g, "")}
         </p>
+        {(mag.added > 0 || mag.removed > 0) && (
+          <span className="hidden shrink-0 items-center gap-1.5 tabular-nums sm:inline-flex">
+            {mag.added > 0 && (
+              <span className="text-[0.6875rem] font-semibold text-emerald-600">+{mag.added}</span>
+            )}
+            {mag.removed > 0 && (
+              <span className="text-[0.6875rem] font-semibold text-rose-500">−{mag.removed}</span>
+            )}
+          </span>
+        )}
         <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-neutral-500">
           <RelativeTime date={parseTimestamp(alert.createdAt)} />
         </span>
@@ -176,11 +191,14 @@ function DetailsView({
 }) {
   const diffAnchor = diffAnchorAlertId ? `alert-diff-${diffAnchorAlertId}` : undefined;
   return (
-    <div className="mt-3 space-y-3 text-sm">
+    <div className="mt-3 space-y-4 text-sm">
       {details.aiChangeSummary?.trim() && (
-        <div className="rounded-lg bg-brand-50/80 px-3 py-2 ring-1 ring-brand-100">
-          <div className="text-xs font-medium text-brand-900">Summary</div>
-          <p className="mt-1 text-sm leading-relaxed text-neutral-800">
+        <div className="rounded-xl bg-gradient-to-br from-brand-50 to-white p-3.5 ring-1 ring-brand-500/15">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-brand-800">
+            <SparkleIcon className="size-3.5" />
+            Summary of changes
+          </div>
+          <p className="mt-1.5 text-sm leading-relaxed text-neutral-800">
             {details.aiChangeSummary.trim()}
           </p>
         </div>
@@ -192,17 +210,15 @@ function DetailsView({
         <LinksBlock title="Removed" tone="rose" urls={details.removed} />
       )}
       {details.pageUrl && (
-        <div>
-          <div className="text-xs font-medium text-neutral-700">Page</div>
-          <a
-            href={details.pageUrl}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="block truncate font-mono text-xs text-brand-700 hover:underline"
-          >
-            {details.pageUrl}
-          </a>
-        </div>
+        <a
+          href={details.pageUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-neutral-50 px-2.5 py-1.5 text-xs text-neutral-600 ring-1 ring-neutral-950/5 transition hover:text-brand-700 hover:ring-brand-500/30"
+        >
+          <LinkIcon className="size-3.5 shrink-0 text-neutral-400" />
+          <span className="truncate font-mono">{details.pageUrl.replace(/^https?:\/\//, "")}</span>
+        </a>
       )}
       {details.newPrice !== undefined && (
         <PriceChangeDetails
@@ -270,26 +286,20 @@ export function DiffPreview({
   const rows = buildPreviewRows(lines);
 
   return (
-    <div className="overflow-hidden rounded-xl ring-1 ring-neutral-950/10 shadow-xs">
-      <div className="flex items-center justify-between gap-3 border-b border-neutral-950/5 bg-neutral-50 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <svg viewBox="0 0 16 16" aria-hidden className="size-3.5 text-neutral-400">
-            <path fill="currentColor" d="M4.177 7.823a.75.75 0 0 1 1.06 0L8 10.586l2.763-2.763a.75.75 0 1 1 1.06 1.06L8.53 12.177a.75.75 0 0 1-1.06 0L4.177 8.884a.75.75 0 0 1 0-1.06Z" />
-            <path fill="currentColor" d="M8 1.5A6.5 6.5 0 1 0 14.5 8H13a5 5 0 1 1-5-5V1.5Z" />
-          </svg>
-          <p className="text-xs font-medium text-neutral-700">Diff preview</p>
-        </div>
+    <div className="overflow-hidden rounded-xl ring-1 ring-neutral-950/[0.08] shadow-xs">
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-950/5 bg-neutral-50/80 px-3 py-2">
+        <p className="text-xs font-semibold text-neutral-700">What changed</p>
         <div className="flex items-center gap-1.5 tabular-nums">
           {added > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 py-0.5 pr-1.5 pl-1 text-[0.6875rem] font-semibold text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6875rem] font-semibold text-emerald-700 ring-1 ring-emerald-600/15 ring-inset">
               <span aria-hidden>＋</span>
-              {added}
+              {added} added
             </span>
           )}
           {removed > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 py-0.5 pr-1.5 pl-1 text-[0.6875rem] font-semibold text-rose-700 ring-1 ring-rose-600/20 ring-inset">
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-rose-50 px-2 py-0.5 text-[0.6875rem] font-semibold text-rose-700 ring-1 ring-rose-600/15 ring-inset">
               <span aria-hidden>－</span>
-              {removed}
+              {removed} removed
             </span>
           )}
         </div>
@@ -454,6 +464,31 @@ export function PriceChangeDetails({
         </span>
       </div>
     </div>
+  );
+}
+
+function changeMagnitude(d: AlertDetails): { added: number; removed: number } {
+  return {
+    added: d.totalAdded ?? d.added?.length ?? 0,
+    removed: d.totalRemoved ?? d.removed?.length ?? 0,
+  };
+}
+
+function SparkleIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden {...props}>
+      <path d="M8 1.5c.28 0 .53.18.62.45l.86 2.57 2.57.86a.66.66 0 0 1 0 1.24l-2.57.86-.86 2.57a.66.66 0 0 1-1.24 0l-.86-2.57-2.57-.86a.66.66 0 0 1 0-1.24l2.57-.86.86-2.57A.66.66 0 0 1 8 1.5Z" />
+      <path d="M12.75 9.5c.19 0 .36.12.42.3l.5 1.48 1.48.5a.44.44 0 0 1 0 .84l-1.48.5-.5 1.48a.44.44 0 0 1-.84 0l-.5-1.48-1.48-.5a.44.44 0 0 1 0-.84l1.48-.5.5-1.48a.44.44 0 0 1 .42-.3Z" />
+    </svg>
+  );
+}
+
+function LinkIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden {...props}>
+      <path d="M6.5 9.5a2.5 2.5 0 0 0 3.54 0l2-2a2.5 2.5 0 0 0-3.54-3.54l-.5.5" />
+      <path d="M9.5 6.5a2.5 2.5 0 0 0-3.54 0l-2 2a2.5 2.5 0 0 0 3.54 3.54l.5-.5" />
+    </svg>
   );
 }
 
