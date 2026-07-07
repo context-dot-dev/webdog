@@ -5,6 +5,7 @@ import { getCurrentSession } from "@/lib/session";
 import { STARTER_TEMPLATES } from "@/lib/starter-templates";
 import { getStarterTemplatesWithLogos } from "@/lib/starter-template-logos.server";
 import { effectiveContextDevApiKey } from "@/lib/server-managed-config";
+import { retrieveBrand, pickBrandAssets } from "@/lib/context-client";
 import { WatchInput } from "@/components/watch-input";
 import { AnimatedNotifList } from "@/components/animated-notif-list";
 import type { NotifItem } from "@/components/animated-notif-list";
@@ -28,12 +29,12 @@ const DEMO_DIFF: { t: "add" | "del" | "ctx"; n: number; c: string }[] = [
 ];
 
 const RAW_NOTIFS: Omit<NotifItem, "logoUrl">[] = [
-  { id: "1", domain: "openai.com",           site: "OpenAI Blog",       message: "New post published",          time: "2m ago",  accentColor: "#111827" },
-  { id: "2", domain: "stripe.com",           site: "Stripe Pricing",    message: "Pricing page updated · +25%", time: "12s ago", accentColor: "#635BFF" },
-  { id: "3", domain: "anthropic.com",        site: "Anthropic Careers", message: "3 new job listings added",    time: "1m ago",  accentColor: "#CC785C" },
-  { id: "4", domain: "vercel.com",           site: "Vercel Changelog",  message: "New product update shipped",  time: "5m ago",  accentColor: "#111827" },
-  { id: "5", domain: "linear.app",           site: "Linear Changelog",  message: "Cycles v2 just launched",     time: "3m ago",  accentColor: "#5E6AD2" },
-  { id: "6", domain: "news.ycombinator.com", site: "Hacker News",       message: "47 new job postings today",   time: "1h ago",  accentColor: "#FF6600" },
+  { id: "1", domain: "openai.com",           site: "OpenAI Blog",       message: "New post published",          time: "2m ago",  accentColor: "#111827", bgColor: "#ffffff" },
+  { id: "2", domain: "stripe.com",           site: "Stripe Pricing",    message: "Pricing page updated · +25%", time: "12s ago", accentColor: "#635BFF", bgColor: "#553afd" },
+  { id: "3", domain: "anthropic.com",        site: "Anthropic Careers", message: "3 new job listings added",    time: "1m ago",  accentColor: "#CC785C", bgColor: "#f1f0e9" },
+  { id: "4", domain: "vercel.com",           site: "Vercel Changelog",  message: "New product update shipped",  time: "5m ago",  accentColor: "#111827", bgColor: "#000000" },
+  { id: "5", domain: "linear.app",           site: "Linear Changelog",  message: "Cycles v2 just launched",     time: "3m ago",  accentColor: "#5E6AD2", bgColor: "#000000" },
+  { id: "6", domain: "news.ycombinator.com", site: "Hacker News",       message: "47 new job postings today",   time: "1h ago",  accentColor: "#F46525", bgColor: "#f3570f", logoDomain: "ycombinator.com" },
 ];
 
 export default async function LandingPage() {
@@ -49,7 +50,31 @@ export default async function LandingPage() {
   }
 
   const logoMap = Object.fromEntries(templates.map((t) => [t.domain, t.logoUrl]));
-  const notifItems: NotifItem[] = RAW_NOTIFS.map((n) => ({ ...n, logoUrl: logoMap[n.domain] ?? null }));
+
+  // Fetch logos for any notif logoDomain overrides not already in the template map.
+  const extraDomains = [...new Set(
+    RAW_NOTIFS.filter((n) => n.logoDomain && !(n.logoDomain in logoMap)).map((n) => n.logoDomain!),
+  )];
+  const extraLogoMap: Record<string, string | null> = {};
+  if (apiKey && extraDomains.length > 0) {
+    await Promise.all(
+      extraDomains.map(async (d) => {
+        try {
+          const brand = await retrieveBrand(d, { apiKey });
+          const { logoUrl } = pickBrandAssets(brand);
+          extraLogoMap[d] = logoUrl;
+        } catch {
+          extraLogoMap[d] = null;
+        }
+      }),
+    );
+  }
+
+  const notifItems: NotifItem[] = RAW_NOTIFS.map((n) => {
+    const lookupDomain = n.logoDomain ?? n.domain;
+    const logoUrl = logoMap[lookupDomain] ?? extraLogoMap[lookupDomain] ?? null;
+    return { ...n, logoUrl };
+  });
 
   return (
     <main className="relative min-h-dvh overflow-x-hidden bg-cream-100 font-sans text-neutral-900 antialiased">
@@ -82,10 +107,8 @@ export default async function LandingPage() {
 
           {/* Left */}
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3.5 py-1 text-xs font-medium text-neutral-600 ring-1 ring-neutral-900/8 backdrop-blur">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
-              Open-source · Self-hostable · MIT
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/badge.png" alt="Open Source · Self-hostable · MIT Licensed" className="h-12 w-auto" />
 
             <h1 className="mt-6 text-[2.75rem] font-semibold leading-[1.1] tracking-tight text-balance sm:text-5xl lg:text-[3.5rem]">
               The internet moves.

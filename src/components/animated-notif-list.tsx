@@ -5,10 +5,14 @@ import { useEffect, useRef, useState } from "react";
 export type NotifItem = {
   id: string;
   domain: string;
+  /** Override domain used for brand-logo lookup (e.g. "ycombinator.com" for HN). */
+  logoDomain?: string;
   site: string;
   message: string;
   time: string;
   accentColor: string;
+  /** Background colour for the logo circle. Defaults to white. */
+  bgColor?: string;
   logoUrl: string | null;
 };
 
@@ -58,18 +62,20 @@ function NotifCard({ item, isNew }: { item: NotifItem; isNew: boolean }) {
       }`}
     >
       <div className="flex flex-row items-center gap-3">
-        {/* Logo on white bg — fully circular. Keep logo small (size-5) so white bg
-            breathes around even full-bleed square brand images (Stripe, Vercel, etc.) */}
-        <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-neutral-900/10">
+        {/* Per-brand coloured circle — no ring when bg is non-white */}
+        <div
+          className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full"
+          style={{ background: item.bgColor ?? "#ffffff", boxShadow: "0 0 0 1px rgba(0,0,0,0.08)" }}
+        >
           {item.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.logoUrl} alt="" className="size-5 object-contain" loading="lazy" />
+            <img src={item.logoUrl} alt="" className="size-6 object-contain" loading="lazy" />
           ) : (
             <span
               className="text-sm font-bold"
-              style={{ color: item.accentColor }}
+              style={{ color: item.bgColor && item.bgColor !== "#ffffff" ? "#ffffff" : item.accentColor }}
             >
-              {item.site[0]}
+              {item.site[0].toUpperCase()}
             </span>
           )}
         </div>
