@@ -4,14 +4,12 @@ export type AiModelOption = { id: string; label: string; description?: string };
 
 export const AI_MODELS_BY_PROVIDER: Record<AiProvider, AiModelOption[]> = {
   openai: [
-    { id: "gpt-5.4-nano", label: "GPT-5.4 Nano (recommended)" },
-    { id: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
-    { id: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+    { id: "gpt-4o-mini", label: "GPT-4o Mini (recommended)" },
+    { id: "gpt-4o", label: "GPT-4o" },
   ],
   vercel_gateway: [
-    { id: "openai/gpt-5.4-nano", label: "GPT-5.4 Nano (recommended)" },
-    { id: "openai/gpt-4.1-nano", label: "GPT-4.1 Nano" },
-    { id: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini" },
+    { id: "openai/gpt-4o-mini", label: "GPT-4o Mini (recommended)" },
+    { id: "openai/gpt-4o", label: "GPT-4o" },
   ],
 };
 
