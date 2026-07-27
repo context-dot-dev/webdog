@@ -176,6 +176,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     enabled: true,
     checkIntervalHours,
     aiChangeSummaryEnabled,
+    aiTriageEnabled,
     createdAt: new Date(),
   });
 
