@@ -15,13 +15,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <body className="min-h-dvh bg-cream-100 font-sans text-neutral-900" suppressHydrationWarning>
         <Script
-          src="https://plausible.io/js/pa-Ou4G9tTYPGSI77dWeauzs.js"
+          src="https://cdn.databuddy.cc/databuddy.js"
+          data-client-id="5089fdbc-d8a2-4a4e-ac04-dbe58386227e"
+          data-track-outgoing-links="true"
+          crossOrigin="anonymous"
           strategy="afterInteractive"
         />
-        <Script id="plausible-init" strategy="afterInteractive">
-          {`window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
-plausible.init()`}
-        </Script>
         <div className="isolate">
           {children}
           <OpenSourceButton />
