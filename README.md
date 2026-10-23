@@ -37,6 +37,7 @@ Paste any URL and webdog will:
 ## Table of contents
 
 - [Why?](#why)
+- [Use cases](#use-cases)
 - [Features](#features)
 - [How it works](#how-it-works)
 - [Quick start](#quick-start)
@@ -65,6 +66,24 @@ Perfect for monitoring:
 - 🏛️ Government websites
 
 ---
+
+## Use cases
+
+### Track competitor pricing
+
+Add the competitor's pricing URL as a **Page content** monitor. Set a watch note such as “Changes to plan prices, included usage, or paid features,” then choose a check interval and notification destination. Keep the worker running: creating a monitor alone does not schedule background checks without it.
+
+The first successful snapshot establishes a baseline. Later changes appear in the alerts inbox with a diff. Enable the optional AI relevance filter to hold routine noise for review; inspect the source before treating a detected edit as a confirmed pricing change.
+
+### Watch product launches and documentation
+
+Use **Site links** to detect URLs added to a site's sitemap. Use **Page content** for an existing changelog or documentation page. A sitemap monitor detects link changes, not edits inside every linked page.
+
+### Follow a product's price
+
+Choose **Product price** for a specific product page. The monitor compares extracted price and currency, with a default check interval of 24 hours. Use Page content when the question concerns plan descriptions or terms rather than a product's numeric price.
+
+webdog runs its own worker and stores snapshots in PostgreSQL. If you want scheduled monitoring through an API without hosting this app, use [Context.dev Monitors](https://www.context.dev/monitors-api); see the [monitoring guide](https://docs.context.dev/monitors/overview) for target types and webhook delivery.
 
 ## Features
 
