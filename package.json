@@ -28,7 +28,7 @@
     "@ai-sdk/gateway": "^3.0.121",
     "@ai-sdk/openai": "^3.0.67",
     "ai": "^6.0.193",
-    "better-auth": "^1.6.13",
+    "better-auth": "^1.6.22",
     "context.dev": "^1.18.0",
     "dotenv": "^16.4.7",
     "drizzle-kit": "^0.31.4",
